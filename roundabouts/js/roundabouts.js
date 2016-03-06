@@ -9,8 +9,6 @@ var _createClass = (function () { function defineProperties(target, props) { for
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var DEBUG = true;
-
 var CellsDrawer = (function () {
     function CellsDrawer(roundaboutSpecification, cellsMap, unitConverter, two) {
         _classCallCheck(this, CellsDrawer);
@@ -84,7 +82,7 @@ var CellsDrawer = (function () {
     }, {
         key: "_drawStrokeIfDebug",
         value: function _drawStrokeIfDebug(cellElement) {
-            if (DEBUG) {
+            if (document.getElementById("debug_on").checked) {
                 cellElement.stroke = "#FF0000";
             } else {
                 cellElement.noStroke();
@@ -109,7 +107,7 @@ var _createClass = (function () { function defineProperties(target, props) { for
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var DRAW_CELLS_GRID = true;
+var DRAW_CELLS_GRID = false;
 var METERS_PER_CELL = 2.5;
 var CELLS_TO_DRAW = 10;
 var ADHERENT_ROAD_LENGTH = METERS_PER_CELL * CELLS_TO_DRAW; // Draw 25m of adherent roads for now
@@ -637,7 +635,6 @@ var CellsMap = (function (_Observable) {
                 throw Error("Vehicle not added");
             }
             var newVehicleFrontCell = this._cellsLane[oldVehicleFrontCell.parentLane()].cellsNextTo(oldVehicleFrontCell, cellsToMove).slice(-1)[0];
-            console.log("dupka", oldVehicleFrontCell, newVehicleFrontCell, cellsToMove);
             var newVehicleCells = this._cellsLane[newVehicleFrontCell.parentLane()].cellsPreviousTo(newVehicleFrontCell, vehicle.lengthCells());
             oldVehicleCells.forEach(function (cell) {
                 cell.setTaken(false);
@@ -707,12 +704,12 @@ var CellularAutomata = (function () {
         var truck = _VehicleJs2['default'].newTruck();
         this._vehicles = [car1, car2, car3, car4, truck, van];
         this._cellsMap = cellsMap;
-        this._cellsMap.addVehicle(car1, 0, Math.floor(Math.random() * 69 + 1));
-        this._cellsMap.addVehicle(car2, 0, Math.floor(Math.random() * 69 + 1));
-        this._cellsMap.addVehicle(car3, 0, Math.floor(Math.random() * 69 + 1));
-        this._cellsMap.addVehicle(car4, 0, Math.floor(Math.random() * 69 + 1));
-        this._cellsMap.addVehicle(truck, 0, Math.floor(Math.random() * 69 + 1));
-        this._cellsMap.addVehicle(van, 0, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(car1, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(car2, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(car3, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(car4, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(truck, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(van, 1, Math.floor(Math.random() * 69 + 1));
     }
 
     _createClass(CellularAutomata, [{
@@ -910,10 +907,12 @@ var _SimulationCellularAutomataJs2 = _interopRequireDefault(_SimulationCellularA
 
 var unitConverter = new _GUIUnitConverterJs2['default'](_RoundaboutSpecificationsJs.roundaboutBukowe.roundaboutDiameter() + _GUIRoundaboutDrawerJs.ADHERENT_ROAD_LENGTH * 2, Math.min(window.innerWidth, window.innerHeight));
 
+var canvasElement = document.getElementById("canvas");
 var twojs = new Two({
-    fullscreen: true,
+    width: canvasElement.clientWidth,
+    height: window.innerHeight,
     autostart: true
-}).appendTo(document.body);
+}).appendTo(canvasElement);
 
 var roundaboutBukoweCellsMap = new _SimulationCellsMapJs.CellsMap(_RoundaboutSpecificationsJs.roundaboutBukowe, unitConverter);
 
