@@ -10,7 +10,7 @@ var _createClass = (function () { function defineProperties(target, props) { for
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var CellsDrawer = (function () {
-    function CellsDrawer(roundaboutSpecification, cellsMap, unitConverter, two) {
+    function CellsDrawer(roundaboutSpecification, cellsMap, unitConverter, two, translator) {
         _classCallCheck(this, CellsDrawer);
 
         this._cellsMap = cellsMap;
@@ -24,6 +24,7 @@ var CellsDrawer = (function () {
         this._cellsMap.registerObserver(this);
         this._drawnCells = [];
         this._cellLengthPx = this._unitConverter.cellsAsPixels(1);
+        this._translator = translator;
     }
 
     /**
@@ -41,6 +42,7 @@ var CellsDrawer = (function () {
         value: function draw() {
             this._clearDrawnElements();
             this._drawRoundaboutGrid();
+            this._drawAdherentRoadsGrid();
         }
     }, {
         key: "_clearDrawnElements",
@@ -54,18 +56,18 @@ var CellsDrawer = (function () {
 
             var cellWidthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.laneWidth());
 
-            this._roundaboutSpecification.lanesNumbers().forEach(function (laneNumber) {
-                var laneRadiusPx = _this._unitConverter.metersAsPixels(_this._roundaboutSpecification.laneRadius(laneNumber));
-                var cellsCount = _this._unitConverter.metersAsCells(_this._roundaboutSpecification.lengthOfLane(laneNumber));
-                _this._cellsMap.cellsOnLane(laneNumber).forEach(function (cell, cellIndex) {
+            this._roundaboutSpecification.innerRoadLanes().forEach(function (lane) {
+                var laneRadiusPx = _this._unitConverter.metersAsPixels(_this._roundaboutSpecification.laneRadius(lane.id()));
+                var cellsCount = _this._unitConverter.metersAsCells(lane.length());
+                _this._cellsMap.cellsOnLane(lane.id()).forEach(function (cell, cellIndex) {
                     var pct = cellsCount - cellIndex / cellsCount;
                     var theta = pct * Math.PI * 2;
                     var x = laneRadiusPx * Math.cos(theta);
                     var y = laneRadiusPx * Math.sin(theta);
                     var singleCell = _this._two.makeRectangle(_this._centerPoint.x + x, _this._centerPoint.y + y, _this._cellLengthPx, cellWidthPx);
                     singleCell.rotation = Math.atan2(-y, -x) + Math.PI / 2;
-                    _this._cellFillColor(cell, singleCell);
                     _this._drawStrokeIfDebug(singleCell);
+                    _this._cellFillColor(cell, singleCell);
                     _this._drawnCells.push(singleCell);
                 });
             });
@@ -73,8 +75,9 @@ var CellsDrawer = (function () {
     }, {
         key: "_cellFillColor",
         value: function _cellFillColor(cell, cellElement) {
-            if (cell.isTaken()) {
-                cellElement.fill = "#FF0000";
+            if (!cell.isEmpty()) {
+                cellElement.fill = "#" + cell.vehicle().id().toString(16);
+                cellElement.stroke = "#FF0000";
             } else {
                 cellElement.fill = "transparent";
             }
@@ -87,6 +90,46 @@ var CellsDrawer = (function () {
             } else {
                 cellElement.noStroke();
             }
+        }
+    }, {
+        key: "_drawAdherentRoadsGrid",
+        value: function _drawAdherentRoadsGrid() {
+            var _this2 = this;
+
+            this._roundaboutSpecification.adherentRoads().forEach(function (road) {
+                _this2._translator.translateTo(_this2._drawAdherentRoadGrid(road), road.id());
+            });
+        }
+    }, {
+        key: "_drawAdherentRoadGrid",
+        value: function _drawAdherentRoadGrid(road) {
+            var _this3 = this;
+
+            var roadWidthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadWidth());
+            var roadLengthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadLength());
+
+            var adherentLanesCount = this._roundaboutSpecification.adherentLanesCount();
+            var cellsToGroup = [];
+            var cellLengthPx = this._unitConverter.cellsAsPixels(1);
+            var cellWidthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadWidth() / adherentLanesCount);
+
+            road.allLanes().forEach(function (lane, i) {
+                var cells = _this3._cellsMap.cellsOnLane(lane.id());
+                if (lane.isExit()) {
+                    cells = cells.slice(0).reverse();
+                }
+
+                cells.forEach(function (cell, j) {
+                    var singleCell = _this3._two.makeRectangle(-roadWidthPx / adherentLanesCount + i / adherentLanesCount * roadWidthPx - cellWidthPx / 2, roadLengthPx / 2 - cellLengthPx / 2 - j * cellLengthPx, cellWidthPx, cellLengthPx);
+                    _this3._drawStrokeIfDebug(singleCell);
+                    _this3._cellFillColor(cell, singleCell);
+                    cellsToGroup.push(singleCell);
+                });
+            });
+
+            var groupedCells = this._two.makeGroup(cellsToGroup);
+            this._drawnCells.push(groupedCells);
+            return groupedCells;
         }
     }]);
 
@@ -107,13 +150,8 @@ var _createClass = (function () { function defineProperties(target, props) { for
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var DRAW_CELLS_GRID = false;
-var METERS_PER_CELL = 2.5;
-var CELLS_TO_DRAW = 10;
-var ADHERENT_ROAD_LENGTH = METERS_PER_CELL * CELLS_TO_DRAW; // Draw 25m of adherent roads for now
-
 var RoundaboutDrawer = (function () {
-    function RoundaboutDrawer(roundaboutSpecification, unitConverter, two) {
+    function RoundaboutDrawer(roundaboutSpecification, unitConverter, two, translator) {
         _classCallCheck(this, RoundaboutDrawer);
 
         this._roundaboutSpecification = roundaboutSpecification;
@@ -124,6 +162,7 @@ var RoundaboutDrawer = (function () {
             y: this._two.height / 2
         };
         this._letRoadMeltIntoRoundabout = 7;
+        this._translator = translator;
     }
 
     _createClass(RoundaboutDrawer, [{
@@ -145,7 +184,7 @@ var RoundaboutDrawer = (function () {
         key: "_drawRoundaboutBrokenLanes",
         value: function _drawRoundaboutBrokenLanes() {
             for (var i = 1; i < this._roundaboutSpecification.lanesCount(); i++) {
-                var laneRadius = this._roundaboutSpecification.roundaboutRadius() - this._roundaboutSpecification.laneWidth() * i; // TODO: Change it
+                var laneRadius = this._roundaboutSpecification.roundaboutRadius() - this._roundaboutSpecification.laneWidth() * i;
                 var laneRadiusPx = this._unitConverter.metersAsPixels(laneRadius);
                 var brokenLinesCount = laneRadius * 4; // It could be anything else but 4 looks cool
 
@@ -172,26 +211,15 @@ var RoundaboutDrawer = (function () {
     }, {
         key: "_drawAdherentRoads",
         value: function _drawAdherentRoads() {
-            var roadLengthPx = this._unitConverter.metersAsPixels(ADHERENT_ROAD_LENGTH);
-            var roundaboutRadiusPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.roundaboutRadius());
-            var pixelsFromCenterToRoadCenter = roundaboutRadiusPx + roadLengthPx / 2;
-
-            var southRoad = this._drawRoad();
-            southRoad.translation.set(this._centerPoint.x, this._centerPoint.y + pixelsFromCenterToRoadCenter);
-            var westRoad = this._drawRoad();
-            westRoad.translation.set(this._centerPoint.x - pixelsFromCenterToRoadCenter, this._centerPoint.y);
-            westRoad.rotation += 1 * Math.PI / 2;
-            var northRoad = this._drawRoad();
-            northRoad.translation.set(this._centerPoint.x, this._centerPoint.y - pixelsFromCenterToRoadCenter);
-            northRoad.rotation += 2 * Math.PI / 2;
-            var eastRoad = this._drawRoad();
-            eastRoad.translation.set(this._centerPoint.x + pixelsFromCenterToRoadCenter, this._centerPoint.y);
-            eastRoad.rotation += 3 * Math.PI / 2;
+            this._translator.translateToSouthRoad(this._drawRoad());
+            this._translator.translateToWestRoad(this._drawRoad());
+            this._translator.translateToNorthRoad(this._drawRoad());
+            this._translator.translateToEastRoad(this._drawRoad());
         }
     }, {
         key: "_drawRoad",
         value: function _drawRoad() {
-            var roadLengthPx = this._unitConverter.metersAsPixels(ADHERENT_ROAD_LENGTH) + this._letRoadMeltIntoRoundabout;
+            var roadLengthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadLength()) + this._letRoadMeltIntoRoundabout;
             var roadWidthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadWidth());
 
             // Create road element
@@ -201,33 +229,11 @@ var RoundaboutDrawer = (function () {
             var middleLine = this._drawContinuousLine(roadLengthPx);
             var leftLines = this._drawStraightBrokenLine(-roadWidthPx / 4, roadLengthPx);
             var rightLines = this._drawStraightBrokenLine(roadWidthPx / 4, roadLengthPx);
-            var cellsGrid = this._drawAdherentRoadsGrid(roadWidthPx, roadLengthPx);
 
-            var groupedElements = [road, middleLine].concat(leftLines, rightLines, cellsGrid);
+            var groupedElements = [road, middleLine].concat(leftLines, rightLines);
 
             var wholeRoad = this._two.makeGroup(groupedElements);
             return wholeRoad;
-        }
-    }, {
-        key: "_drawAdherentRoadsGrid",
-        value: function _drawAdherentRoadsGrid(roadWidthPx, roadLengthPx) {
-            if (!DRAW_CELLS_GRID) {
-                return [];
-            }
-            var adherentRoadsCount = this._roundaboutSpecification.adherentRoadsCount();
-            var cells = [];
-            var cellLengthPx = this._unitConverter.cellsAsPixels(1);
-            var cellWidthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadWidth() / adherentRoadsCount);
-
-            for (var i = 0; i < adherentRoadsCount; i++) {
-                for (var j = 0; j < CELLS_TO_DRAW; j++) {
-                    var cell = this._two.makeRectangle(-roadWidthPx / adherentRoadsCount + i / adherentRoadsCount * roadWidthPx - cellWidthPx / 2, roadLengthPx / 2 - cellLengthPx / 2 - j * cellLengthPx, cellWidthPx, cellLengthPx);
-                    cell.stroke = "#FF0000";
-                    cell.fill = "transparent";
-                    cells.push(cell);
-                }
-            }
-            return cells;
         }
     }, {
         key: "_drawStraightBrokenLine",
@@ -262,9 +268,82 @@ var RoundaboutDrawer = (function () {
 })();
 
 exports.RoundaboutDrawer = RoundaboutDrawer;
-exports.ADHERENT_ROAD_LENGTH = ADHERENT_ROAD_LENGTH;
 
 },{}],3:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var Translator = (function () {
+    function Translator(roundaboutSpecification, unitConverter, two) {
+        _classCallCheck(this, Translator);
+
+        this._roundaboutSpecification = roundaboutSpecification;
+        this._unitConverter = unitConverter;
+        this._two = two;
+        this._centerPoint = {
+            x: this._two.width / 2,
+            y: this._two.height / 2
+        };
+
+        var roadLengthPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.adherentRoadLength());
+        var roundaboutRadiusPx = this._unitConverter.metersAsPixels(this._roundaboutSpecification.roundaboutRadius());
+        this._pixelsFromCenterToRoadCenter = roundaboutRadiusPx + roadLengthPx / 2;
+    }
+
+    _createClass(Translator, [{
+        key: 'translateTo',
+        value: function translateTo(elements, where) {
+            if (where == 'N') {
+                this.translateToNorthRoad(elements);
+            } else if (where == 'S') {
+                this.translateToSouthRoad(elements);
+            } else if (where == 'E') {
+                this.translateToEastRoad(elements);
+            } else if (where == 'W') {
+                this.translateToWestRoad(elements);
+            } else {
+                throw new Error("Unknown direction " + where);
+            }
+        }
+    }, {
+        key: 'translateToSouthRoad',
+        value: function translateToSouthRoad(elements) {
+            elements.translation.set(this._centerPoint.x, this._centerPoint.y + this._pixelsFromCenterToRoadCenter);
+        }
+    }, {
+        key: 'translateToWestRoad',
+        value: function translateToWestRoad(elements) {
+            elements.translation.set(this._centerPoint.x - this._pixelsFromCenterToRoadCenter, this._centerPoint.y);
+            elements.rotation += 1 * Math.PI / 2;
+        }
+    }, {
+        key: 'translateToNorthRoad',
+        value: function translateToNorthRoad(elements) {
+            elements.translation.set(this._centerPoint.x, this._centerPoint.y - this._pixelsFromCenterToRoadCenter);
+            elements.rotation += 2 * Math.PI / 2;
+        }
+    }, {
+        key: 'translateToEastRoad',
+        value: function translateToEastRoad(elements) {
+            elements.translation.set(this._centerPoint.x + this._pixelsFromCenterToRoadCenter, this._centerPoint.y);
+            elements.rotation += 3 * Math.PI / 2;
+        }
+    }]);
+
+    return Translator;
+})();
+
+exports['default'] = Translator;
+module.exports = exports['default'];
+
+},{}],4:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -313,7 +392,7 @@ var UnitConverter = (function () {
 exports["default"] = UnitConverter;
 module.exports = exports["default"];
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -327,119 +406,7 @@ function range(start, count) {
 
 exports.range = range;
 
-//TODO: Consider this Array.from(new Array(5), (x,i) => i)
-
-},{}],5:[function(require,module,exports){
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-
-var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-var _JsWhyYouNoImplementJs = require('./JsWhyYouNoImplement.js');
-
-var RoundaboutSpecification = (function () {
-    function RoundaboutSpecification(laneWidth, lanesCount, islandRadius, adherentRoadSpecification) {
-        _classCallCheck(this, RoundaboutSpecification);
-
-        this._laneWidth = laneWidth;
-        this._lanesCount = lanesCount;
-        this._islandRadius = islandRadius;
-        this._adherentRoadSpecification = adherentRoadSpecification;
-    }
-
-    _createClass(RoundaboutSpecification, [{
-        key: "roundaboutDiameter",
-        value: function roundaboutDiameter() {
-            var islandDiameter = 2 * this._islandRadius;
-            return islandDiameter + this.lanesWidth() * 2;
-        }
-    }, {
-        key: "roundaboutRadius",
-        value: function roundaboutRadius() {
-            return this.roundaboutDiameter() / 2;
-        }
-    }, {
-        key: "lanesCount",
-        value: function lanesCount() {
-            return this._lanesCount;
-        }
-    }, {
-        key: "lanesWidth",
-        value: function lanesWidth() {
-            return this.lanesCount() * this.laneWidth();
-        }
-    }, {
-        key: "lanesNumbers",
-        value: function lanesNumbers() {
-            return (0, _JsWhyYouNoImplementJs.range)(0, this.lanesCount());
-        }
-    }, {
-        key: "laneWidth",
-        value: function laneWidth() {
-            return this._laneWidth;
-        }
-    }, {
-        key: "islandRadius",
-        value: function islandRadius() {
-            return this._islandRadius;
-        }
-    }, {
-        key: "adherentRoadWidth",
-        value: function adherentRoadWidth() {
-            return this._adherentRoadSpecification.ingoingLanes * this._adherentRoadSpecification.lanesWidth + this._adherentRoadSpecification.outgoingLanes * this._adherentRoadSpecification.lanesWidth;
-        }
-    }, {
-        key: "adherentRoadsCount",
-        value: function adherentRoadsCount() {
-            return this._adherentRoadSpecification.ingoingLanes + this._adherentRoadSpecification.outgoingLanes;
-        }
-    }, {
-        key: "lengthOfLane",
-        value: function lengthOfLane(laneNumber) {
-            if (laneNumber >= this.lanesCount()) {
-                throw new Error("Incorrect lane number - 0 is the most inner, 1 is outer.");
-            }
-            return 2 * Math.PI * (this.islandRadius() + laneNumber * this.laneWidth());
-        }
-
-        /**
-         * Radius is counted to center of the lane
-         */
-    }, {
-        key: "laneRadius",
-        value: function laneRadius(laneNumber) {
-            if (laneNumber >= this.lanesCount()) {
-                throw new Error("Incorrect lane number - 0 is the most inner, 1 is outer.");
-            }
-
-            return this.islandRadius() + this.laneWidth() * laneNumber + this.laneWidth() / 2;
-        }
-    }]);
-
-    return RoundaboutSpecification;
-})();
-
-var roundaboutBukowe = new RoundaboutSpecification(4.5, 2, 56 / 2, {
-    ingoingLanes: 2,
-    outgoingLanes: 2,
-    lanesWidth: 3.5
-});
-
-var roundaboutThreeLanes = new RoundaboutSpecification(4.5, 3, 56 / 2, {
-    ingoingLanes: 2,
-    outgoingLanes: 2,
-    lanesWidth: 3.5
-});
-
-exports.roundaboutBukowe = roundaboutBukowe;
-exports.roundaboutThreeLanes = roundaboutThreeLanes;
-
-},{"./JsWhyYouNoImplement.js":4}],6:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -451,42 +418,64 @@ var _createClass = (function () { function defineProperties(target, props) { for
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Cell = (function () {
-    function Cell(parentLane, cellId) {
+    function Cell(cellId) {
         _classCallCheck(this, Cell);
 
-        this._parentLane = parentLane;
+        this._parentLane = null;
         this._cellId = cellId;
-        this._taken = false;
+        this._vehicle = false;
     }
 
     _createClass(Cell, [{
+        key: "setVehicle",
+        value: function setVehicle(vehicle) {
+            if (vehicle && !this.isEmpty()) {
+                throw new Error("Vehicle " + vehicle.toString() + " crashed onto " + this._vehicle.toString());
+            }
+            this._vehicle = vehicle;
+        }
+    }, {
+        key: "vehicle",
+        value: function vehicle() {
+            return this._vehicle;
+        }
+    }, {
+        key: "isEmpty",
+        value: function isEmpty() {
+            return !this._vehicle;
+        }
+    }, {
+        key: "id",
+        value: function id() {
+            if (this.parentLane()) {
+                return this.parentLane().id().toString() + this._cellId.toString();
+            }
+            throw new Error("Cannot generate id until a lane is not assigned");
+        }
+    }, {
+        key: "assignToLane",
+        value: function assignToLane(lane) {
+            if (this._parentLane) {
+                throw new Error("Cannot reassign cell to another lane");
+            }
+            this._parentLane = lane;
+        }
+    }, {
         key: "parentLane",
         value: function parentLane() {
+            if (!this._parentLane) {
+                throw new Error("Cell unassigned to lane");
+            }
             return this._parentLane;
         }
     }, {
         key: "equals",
         value: function equals(anotherCell) {
-            return this._parentLane == anotherCell._parentLane && this._cellId == anotherCell._cellId;
+            return this.id() == anotherCell.id();
         }
     }, {
-        key: "setTaken",
-        value: function setTaken(taken) {
-            this._taken = taken;
-        }
-    }, {
-        key: "isTaken",
-        value: function isTaken() {
-            return this._taken;
-        }
-    }, {
-        key: "isEmpty",
-        value: function isEmpty() {
-            return !this._taken;
-        }
-    }, {
-        key: "id",
-        value: function id() {
+        key: "number",
+        value: function number() {
             return this._cellId;
         }
     }]);
@@ -498,66 +487,109 @@ exports["default"] = Cell;
 module.exports = exports["default"];
 
 },{}],7:[function(require,module,exports){
-"use strict";
+'use strict';
 
-Object.defineProperty(exports, "__esModule", {
+Object.defineProperty(exports, '__esModule', {
     value: true
 });
 
-var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var _JsWhyYouNoImplementJs = require('../JsWhyYouNoImplement.js');
+
+var _CellJs = require('./Cell.js');
+
+var _CellJs2 = _interopRequireDefault(_CellJs);
 
 var CellsLane = (function () {
-    function CellsLane(cells) {
+    _createClass(CellsLane, null, [{
+        key: 'newLane',
+        value: function newLane(laneId, lengthCells) {
+            var isRounded = arguments.length <= 2 || arguments[2] === undefined ? true : arguments[2];
+
+            var cells = [];
+            (0, _JsWhyYouNoImplementJs.range)(0, lengthCells).forEach(function (cellNumber) {
+                cells.push(new _CellJs2['default'](cellNumber));
+            });
+            return new CellsLane(laneId, cells, isRounded);
+        }
+    }]);
+
+    function CellsLane(id, cells, isRounded) {
         var _this = this;
 
         _classCallCheck(this, CellsLane);
 
-        this._cellsIdsToCells = {};
-        this._cellsIds = [];
         cells.forEach(function (cell) {
-            _this._cellsIdsToCells[cell.id()] = cell;
-            _this._cellsIds.push(cell.id());
+            cell.assignToLane(_this);
         });
-
-        this._cellsIdsReversed = this._cellsIds.slice().reverse();
+        this._id = id;
+        this._allCells = cells;
+        this._allCellsReversed = this._allCells.slice().reverse();
+        this._isRounded = isRounded;
     }
 
     _createClass(CellsLane, [{
-        key: "cellsNextTo",
+        key: 'id',
+        value: function id() {
+            return this._id;
+        }
+    }, {
+        key: 'cellsNextTo',
         value: function cellsNextTo(cell, limitTo) {
-            return this._cellsNextTo(cell, limitTo, this._cellsIds);
+            return this._cellsNextTo(cell, limitTo, this._allCells);
         }
     }, {
-        key: "cellsPreviousTo",
+        key: 'cellsPreviousTo',
         value: function cellsPreviousTo(cell, limitTo) {
-            return this._cellsNextTo(cell, limitTo, this._cellsIdsReversed);
+            return this._cellsNextTo(cell, limitTo, this._allCellsReversed);
         }
     }, {
-        key: "_cellsNextTo",
+        key: 'cellsPreviousToInclusive',
+        value: function cellsPreviousToInclusive(cell, limitTo) {
+            return [cell].concat(this._cellsNextTo(cell, limitTo - 1, this._allCellsReversed));
+        }
+    }, {
+        key: 'allCells',
+        value: function allCells() {
+            return this._allCells;
+        }
+    }, {
+        key: '_cellsNextTo',
         value: function _cellsNextTo(cell, limitTo, arrayFrom) {
-            var _this2 = this;
-
-            var nextCellId = arrayFrom.indexOf(cell.id()) + 1;
-            var nextCellsIds = arrayFrom.slice(nextCellId, nextCellId + limitTo);
-            var missingCells = limitTo - nextCellsIds.length;
-            nextCellsIds = nextCellsIds.concat(arrayFrom.slice(0, missingCells));
-            var nextCells = [];
-            nextCellsIds.forEach(function (nextCellId) {
-                nextCells.push(_this2._cellsIdsToCells[nextCellId]);
+            var cellIndex = arrayFrom.findIndex(function (element) {
+                return element.equals(cell);
             });
+            if (cellIndex == -1) {
+                throw new Error("Cell not found ", cell.id());
+            }
+            var nextCellIndex = cellIndex + 1;
+            var nextCells = arrayFrom.slice(nextCellIndex, nextCellIndex + limitTo);
+            var missingCells = limitTo - nextCells.length;
+
+            if (this._isRounded && missingCells) {
+                nextCells = nextCells.concat(arrayFrom.slice(0, missingCells));
+            }
             return nextCells;
+        }
+    }, {
+        key: 'isExitLane',
+        value: function isExitLane() {
+            return !this._isRounded; //TODO: Take care of entrances also
         }
     }]);
 
     return CellsLane;
 })();
 
-exports["default"] = CellsLane;
-module.exports = exports["default"];
+exports['default'] = CellsLane;
+module.exports = exports['default'];
 
-},{}],8:[function(require,module,exports){
+},{"../JsWhyYouNoImplement.js":5,"./Cell.js":6}],8:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -573,8 +605,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'd
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var _JsWhyYouNoImplementJs = require('../JsWhyYouNoImplement.js');
 
 var _CellJs = require('./Cell.js');
 
@@ -592,6 +622,20 @@ var _ObservableJs = require('./Observable.js');
 
 var _ObservableJs2 = _interopRequireDefault(_ObservableJs);
 
+var ExitRoadEnd = (function (_Error) {
+    _inherits(ExitRoadEnd, _Error);
+
+    function ExitRoadEnd(message) {
+        _classCallCheck(this, ExitRoadEnd);
+
+        _get(Object.getPrototypeOf(ExitRoadEnd.prototype), 'constructor', this).call(this, message);
+        this.message = message;
+        this.name = 'ExitRoadEnd';
+    }
+
+    return ExitRoadEnd;
+})(Error);
+
 var CellsMap = (function (_Observable) {
     _inherits(CellsMap, _Observable);
 
@@ -601,9 +645,7 @@ var CellsMap = (function (_Observable) {
         _get(Object.getPrototypeOf(CellsMap.prototype), 'constructor', this).call(this);
         this._roundaboutSpecification = roundaboutSpecification;
         this._unitConverter = unitConverter;
-        this._laneCells = {};
-        this._cellsLane = {};
-        this._vehiclesOnCells = {};
+        this._lanes = {};
         this._divideLanesToCells();
     }
 
@@ -612,38 +654,43 @@ var CellsMap = (function (_Observable) {
         value: function _divideLanesToCells() {
             var _this = this;
 
-            this._roundaboutSpecification.lanesNumbers().forEach(function (laneNumber) {
-                _this._laneCells[laneNumber] = [];
-                var cellsCount = _this._unitConverter.metersAsCells(_this._roundaboutSpecification.lengthOfLane(laneNumber));
-                (0, _JsWhyYouNoImplementJs.range)(0, cellsCount).forEach(function (cellNumber) {
-                    _this._laneCells[laneNumber].push(new _CellJs2['default'](laneNumber, cellNumber));
-                });
-                _this._cellsLane[laneNumber] = new _CellsLaneJs2['default'](_this._laneCells[laneNumber]);
+            this._roundaboutSpecification.allLanes().forEach(function (lane) {
+                _this._lanes[lane.id()] = _CellsLaneJs2['default'].newLane(lane.id(), _this._unitConverter.metersAsCells(lane.length()), lane.isRounded());
             });
         }
     }, {
         key: 'cellsOnLane',
         value: function cellsOnLane(laneNumber) {
-            return this._laneCells[laneNumber];
+            return this._lanes[laneNumber].allCells();
+        }
+    }, {
+        key: 'cellsCountOnLane',
+        value: function cellsCountOnLane(laneNumber) {
+            return this._lanes[laneNumber].allCells().length;
+        }
+    }, {
+        key: 'outerLaneNumber',
+        value: function outerLaneNumber() {
+            return this._roundaboutSpecification.lanesCount() - 1;
         }
     }, {
         key: 'moveVehicleBy',
         value: function moveVehicleBy(vehicle, cellsToMove) {
-            var oldVehicleCells = this._vehiclesOnCells[vehicle.id()];
-            var oldVehicleFrontCell = oldVehicleCells[0];
-            if (!oldVehicleFrontCell) {
-                throw Error("Vehicle not added");
+            if (cellsToMove == 0) {
+                return;
             }
-            var newVehicleFrontCell = this._cellsLane[oldVehicleFrontCell.parentLane()].cellsNextTo(oldVehicleFrontCell, cellsToMove).slice(-1)[0];
-            var newVehicleCells = this._cellsLane[newVehicleFrontCell.parentLane()].cellsPreviousTo(newVehicleFrontCell, vehicle.lengthCells());
-            oldVehicleCells.forEach(function (cell) {
-                cell.setTaken(false);
-            });
-            newVehicleCells.forEach(function (cell) {
-                cell.setTaken(true);
-            });
-
-            this._vehiclesOnCells[vehicle.id()] = newVehicleCells;
+            var nextCells = vehicle.frontCell().parentLane().cellsNextTo(vehicle.frontCell(), cellsToMove);
+            if (nextCells.length < cellsToMove && vehicle.frontCell().parentLane().isExitLane()) {
+                throw new ExitRoadEnd("End of exit road");
+            }
+            var newVehicleFrontCell = nextCells.slice(-1)[0];
+            var newVehicleCells = newVehicleFrontCell.parentLane().cellsPreviousToInclusive(newVehicleFrontCell, vehicle.lengthCells());
+            var oldVehicleCells = vehicle.currentCells();
+            if (newVehicleCells.length != oldVehicleCells.length) {
+                //TODO: Hardcoded 2 for truck
+                newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(2, 2 + oldVehicleCells.length - newVehicleCells.length));
+            }
+            vehicle.moveToCells(newVehicleCells);
         }
     }, {
         key: 'addVehicle',
@@ -653,20 +700,27 @@ var CellsMap = (function (_Observable) {
 
             var firstCell = this.cellsOnLane(lane)[cell];
             var vehicleCells = [firstCell];
-            vehicleCells = vehicleCells.concat(this._cellsLane[lane].cellsPreviousTo(firstCell, vehicle.lengthCells() - 1));
-            this._vehiclesOnCells[vehicle.id()] = vehicleCells;
-            vehicleCells.forEach(function (cell) {
-                cell.setTaken(true);
-            });
+            vehicleCells = vehicleCells.concat(firstCell.parentLane().cellsPreviousTo(firstCell, vehicle.lengthCells() - 1));
+            vehicle.moveToCells(vehicleCells);
         }
     }, {
         key: 'nothingInFrontOf',
         value: function nothingInFrontOf(vehicle, numberOfCellsToCheck) {
-            var vehiclesFirstCell = this._vehiclesOnCells[vehicle.id()][0];
-            var nextCells = this._cellsLane[vehiclesFirstCell.parentLane()].cellsNextTo(vehiclesFirstCell, numberOfCellsToCheck);
+            var nextCells = vehicle.frontCell().parentLane().cellsNextTo(vehicle.frontCell(), numberOfCellsToCheck);
             return nextCells.every(function (cell) {
                 return cell.isEmpty();
             });
+        }
+    }, {
+        key: 'takeExit',
+        value: function takeExit(vehicle) {
+            var oldVehicleCells = vehicle.currentCells();
+            var sliceFrom = Math.max(0, vehicle.currentSpeed() - vehicle.lengthCells());
+            var sliceTo = vehicle.currentSpeed();
+            //TODO: Hardcoded EXIT_1
+            var newVehicleCells = this._lanes[vehicle.destinationExit() + "_EXIT_1"].allCells().slice(sliceFrom, sliceTo).reverse();
+            var newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(0, oldVehicleCells.length - newVehicleCells.length));
+            vehicle.moveToCells(newVehicleCells);
         }
     }]);
 
@@ -674,8 +728,80 @@ var CellsMap = (function (_Observable) {
 })(_ObservableJs2['default']);
 
 exports.CellsMap = CellsMap;
+exports.ExitRoadEnd = ExitRoadEnd;
 
-},{"../JsWhyYouNoImplement.js":4,"./Cell.js":6,"./CellsLane.js":7,"./Observable.js":10,"./Vehicle.js":11}],9:[function(require,module,exports){
+},{"./Cell.js":6,"./CellsLane.js":7,"./Observable.js":11,"./Vehicle.js":17}],9:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var _CellJs = require('./Cell.js');
+
+var _CellJs2 = _interopRequireDefault(_CellJs);
+
+var _SpecificationDirectionJs = require('./Specification/Direction.js');
+
+var _SpecificationDirectionJs2 = _interopRequireDefault(_SpecificationDirectionJs);
+
+var _JsWhyYouNoImplementJs = require('../JsWhyYouNoImplement.js');
+
+var CellsNeighbours = (function () {
+    function CellsNeighbours(laneCellsCount) {
+        _classCallCheck(this, CellsNeighbours);
+
+        var roadEvery = Math.floor(laneCellsCount / 4);
+        var firstRoadAt = roadEvery - 3;
+        if (!laneCellsCount) {
+            throw new Error("Unknown cells number");
+        }
+        this._exits = {
+            'N': [firstRoadAt + roadEvery * 0, firstRoadAt + 1 + roadEvery * 0],
+            'W': [firstRoadAt + roadEvery * 1, firstRoadAt + 1 + roadEvery * 1],
+            'S': [firstRoadAt + roadEvery * 2, firstRoadAt + 1 + roadEvery * 2],
+            'E': [firstRoadAt + roadEvery * 3, firstRoadAt + 1 + roadEvery * 3]
+        };
+    }
+
+    _createClass(CellsNeighbours, [{
+        key: 'isApproachingExit',
+        value: function isApproachingExit(vehicle) {
+            //TODO: Base on rules check if can leave roundabout from the lane number
+            var closestDestinationExitOn = this._exits[vehicle.destinationExit()][0];
+            var distanceFromExit = closestDestinationExitOn - vehicle.frontCell().number();
+            var distanceTravelledIfStartsSlowingDown = (0, _JsWhyYouNoImplementJs.range)(vehicle.maxSpeedWhenTurning(), Math.max(0, vehicle.currentSpeed() - 1)).reduce(function (previousValue, currentValue) {
+                return previousValue + currentValue;
+            }, 0);
+            if (distanceTravelledIfStartsSlowingDown >= distanceFromExit && distanceFromExit > 0) {
+                return true;
+            }
+            return false;
+        }
+    }, {
+        key: 'canTakeExit',
+        value: function canTakeExit(vehicle) {
+            var destinationExitCell = new _CellJs2['default'](this._exits[vehicle.destinationExit()][0]);
+            destinationExitCell.assignToLane(vehicle.frontCell().parentLane());
+            return vehicle.currentCells().some(function (cell) {
+                return cell.equals(destinationExitCell);
+            });
+        }
+    }]);
+
+    return CellsNeighbours;
+})();
+
+exports['default'] = CellsNeighbours;
+module.exports = exports['default'];
+
+},{"../JsWhyYouNoImplement.js":5,"./Cell.js":6,"./Specification/Direction.js":13}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -692,24 +818,37 @@ var _VehicleJs = require('./Vehicle.js');
 
 var _VehicleJs2 = _interopRequireDefault(_VehicleJs);
 
+var _VehicleFactoryJs = require('./VehicleFactory.js');
+
+var _VehicleFactoryJs2 = _interopRequireDefault(_VehicleFactoryJs);
+
+var _CellsMapJs = require('./CellsMap.js');
+
 var CellularAutomata = (function () {
-    function CellularAutomata(cellsMap) {
+    function CellularAutomata(cellsMap, cellsNeighbours) {
         _classCallCheck(this, CellularAutomata);
 
-        var car1 = _VehicleJs2['default'].newCar();
-        var car2 = _VehicleJs2['default'].newCar();
-        var car3 = _VehicleJs2['default'].newCar();
-        var car4 = _VehicleJs2['default'].newCar();
-        var van = _VehicleJs2['default'].newVan();
-        var truck = _VehicleJs2['default'].newTruck();
+        var car1 = _VehicleFactoryJs2['default'].newCar();
+        car1.setDestinationExit('N');
+        var car2 = _VehicleFactoryJs2['default'].newCar();
+        car2.setDestinationExit('N');
+        var car3 = _VehicleFactoryJs2['default'].newCar();
+        car3.setDestinationExit('N');
+        var car4 = _VehicleFactoryJs2['default'].newCar();
+        car4.setDestinationExit('N');
+        var van = _VehicleFactoryJs2['default'].newVan();
+        van.setDestinationExit('N');
+        var truck = _VehicleFactoryJs2['default'].newTruck();
+        truck.setDestinationExit('N');
         this._vehicles = [car1, car2, car3, car4, truck, van];
         this._cellsMap = cellsMap;
-        this._cellsMap.addVehicle(car1, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(car1, 1, 0);
         this._cellsMap.addVehicle(car2, 1, Math.floor(Math.random() * 69 + 1));
         this._cellsMap.addVehicle(car3, 1, Math.floor(Math.random() * 69 + 1));
         this._cellsMap.addVehicle(car4, 1, Math.floor(Math.random() * 69 + 1));
-        this._cellsMap.addVehicle(truck, 1, Math.floor(Math.random() * 69 + 1));
         this._cellsMap.addVehicle(van, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsMap.addVehicle(truck, 1, Math.floor(Math.random() * 69 + 1));
+        this._cellsNeighbours = cellsNeighbours;
     }
 
     _createClass(CellularAutomata, [{
@@ -718,7 +857,16 @@ var CellularAutomata = (function () {
             var _this = this;
 
             this._vehicles.forEach(function (vehicle) {
-                vehicle.moveToNextIteration(_this._cellsMap);
+                try {
+                    vehicle.moveToNextIteration(_this._cellsMap, _this._cellsNeighbours);
+                } catch (e) {
+                    if (e instanceof _CellsMapJs.ExitRoadEnd) {
+                        vehicle.remove();
+                        _this._vehicles.splice(_this._vehicles.indexOf(vehicle), 1);
+                    } else {
+                        throw e;
+                    }
+                }
             });
             this._cellsMap.notifyAll();
         }
@@ -730,7 +878,7 @@ var CellularAutomata = (function () {
 exports['default'] = CellularAutomata;
 module.exports = exports['default'];
 
-},{"./Vehicle.js":11}],10:[function(require,module,exports){
+},{"./CellsMap.js":8,"./Vehicle.js":17,"./VehicleFactory.js":18}],11:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -773,7 +921,367 @@ var Observable = (function () {
 exports["default"] = Observable;
 module.exports = exports["default"];
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var _JsWhyYouNoImplementJs = require('../../JsWhyYouNoImplement.js');
+
+var _LaneJs = require('./Lane.js');
+
+var _LaneJs2 = _interopRequireDefault(_LaneJs);
+
+var AdherentRoad = (function () {
+    function AdherentRoad(direction, length, entrancesLanes, exitLanes) {
+        _classCallCheck(this, AdherentRoad);
+
+        this._length = length;
+        this._direction = direction;
+        this._entrancesLanes = entrancesLanes;
+        this._exitsLanes = exitLanes;
+    }
+
+    _createClass(AdherentRoad, [{
+        key: 'id',
+        value: function id() {
+            return this._direction.id();
+        }
+    }, {
+        key: 'length',
+        value: function length() {
+            return this._length;
+        }
+    }, {
+        key: 'allLanes',
+        value: function allLanes() {
+            return this._exitsLanes; //this._entrancesLanes.concat(this._exitsLanes); //TODO: Przywrócić jak dodane będzie rysowanie wjazdów
+        }
+    }], [{
+        key: 'newRoad',
+        value: function newRoad(direction, length, laneWidth, entrancesLanesCount, exitLanesCount) {
+            var entranceLanes = Array.from((0, _JsWhyYouNoImplementJs.range)(0, entrancesLanesCount), function (entranceNumber) {
+                return new _LaneJs2['default'](direction.id() + '_ENTRANCE_' + entranceNumber, length, laneWidth, false);
+            });
+            var exitLanes = Array.from((0, _JsWhyYouNoImplementJs.range)(0, exitLanesCount), function (exitNumber) {
+                return new _LaneJs2['default'](direction.id() + '_EXIT_' + exitNumber, length, laneWidth, false);
+            });
+            exitLanes.reverse();
+
+            return new AdherentRoad(direction, length, entranceLanes, exitLanes);
+        }
+    }]);
+
+    return AdherentRoad;
+})();
+
+exports['default'] = AdherentRoad;
+module.exports = exports['default'];
+
+},{"../../JsWhyYouNoImplement.js":5,"./Lane.js":15}],13:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Direction = (function () {
+    _createClass(Direction, null, [{
+        key: "allDirections",
+        value: function allDirections() {
+            return Array.from(["N", "S", "E", "W"], function (directionId) {
+                return new Direction(directionId);
+            });
+        }
+    }]);
+
+    function Direction(direction) {
+        _classCallCheck(this, Direction);
+
+        this._direction = direction;
+    }
+
+    _createClass(Direction, [{
+        key: "id",
+        value: function id() {
+            return this._direction;
+        }
+    }]);
+
+    return Direction;
+})();
+
+exports["default"] = Direction;
+module.exports = exports["default"];
+
+},{}],14:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var InnerRoad = (function () {
+    function InnerRoad(lanes) {
+        _classCallCheck(this, InnerRoad);
+
+        this._lanes = lanes;
+    }
+
+    _createClass(InnerRoad, [{
+        key: "allLanes",
+        value: function allLanes() {
+            return this._lanes;
+        }
+    }, {
+        key: "lanesCount",
+        value: function lanesCount() {
+            return this._lanes.length;
+        }
+    }]);
+
+    return InnerRoad;
+})();
+
+exports["default"] = InnerRoad;
+module.exports = exports["default"];
+
+},{}],15:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var Lane = (function () {
+    function Lane(id, length, width, isRounded) {
+        _classCallCheck(this, Lane);
+
+        this._id = id;
+        this._length = length;
+        this._width = width;
+        this._isRounded = isRounded;
+    }
+
+    _createClass(Lane, [{
+        key: 'id',
+        value: function id() {
+            return this._id;
+        }
+    }, {
+        key: 'length',
+        value: function length() {
+            return this._length;
+        }
+    }, {
+        key: 'isRounded',
+        value: function isRounded() {
+            return this._isRounded;
+        }
+    }, {
+        key: 'width',
+        value: function width() {
+            return this._width;
+        }
+    }, {
+        key: 'isExit',
+        value: function isExit() {
+            return this._id.indexOf('EXIT') != -1;
+        }
+    }]);
+
+    return Lane;
+})();
+
+exports['default'] = Lane;
+module.exports = exports['default'];
+
+},{}],16:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var _JsWhyYouNoImplementJs = require('../../JsWhyYouNoImplement.js');
+
+var _LaneJs = require('./Lane.js');
+
+var _LaneJs2 = _interopRequireDefault(_LaneJs);
+
+var _DirectionJs = require('./Direction.js');
+
+var _DirectionJs2 = _interopRequireDefault(_DirectionJs);
+
+var _AdherentRoadJs = require('./AdherentRoad.js');
+
+var _AdherentRoadJs2 = _interopRequireDefault(_AdherentRoadJs);
+
+var _InnerRoadJs = require('./InnerRoad.js');
+
+var _InnerRoadJs2 = _interopRequireDefault(_InnerRoadJs);
+
+var RoundaboutSpecification = (function () {
+    function RoundaboutSpecification(laneWidth, lanesCount, islandRadius, adherentRoadSpecification) {
+        var _this = this;
+
+        _classCallCheck(this, RoundaboutSpecification);
+
+        this._laneWidth = laneWidth;
+        this._lanesCount = lanesCount;
+        this._islandRadius = islandRadius;
+        this._adherentRoadSpecification = adherentRoadSpecification;
+        this._adherentRoads = Array.from(_DirectionJs2['default'].allDirections(), function (direction) {
+            return _AdherentRoadJs2['default'].newRoad(direction, _this.adherentRoadLength(), laneWidth, adherentRoadSpecification.ingoingLanes, adherentRoadSpecification.outgoingLanes);
+        });
+        this._innerRoad = new _InnerRoadJs2['default'](Array.from((0, _JsWhyYouNoImplementJs.range)(0, lanesCount), function (laneNumber) {
+            return new _LaneJs2['default'](laneNumber, _this.lengthOfLane(laneNumber), laneWidth, true);
+        }));
+    }
+
+    _createClass(RoundaboutSpecification, [{
+        key: 'roundaboutDiameter',
+        value: function roundaboutDiameter() {
+            var islandDiameter = 2 * this._islandRadius;
+            return islandDiameter + this.lanesWidth() * 2;
+        }
+    }, {
+        key: 'roundaboutRadius',
+        value: function roundaboutRadius() {
+            return this.roundaboutDiameter() / 2;
+        }
+    }, {
+        key: 'lanesCount',
+        value: function lanesCount() {
+            return this._lanesCount;
+        }
+    }, {
+        key: 'adherentRoadLength',
+        value: function adherentRoadLength() {
+            return 35; // 25 meters
+        }
+    }, {
+        key: 'lanesWidth',
+        value: function lanesWidth() {
+            return this._innerRoad.lanesCount() * this.laneWidth();
+        }
+    }, {
+        key: 'lanesNumbers',
+        value: function lanesNumbers() {
+            return (0, _JsWhyYouNoImplementJs.range)(0, this._innerRoad.lanesCount());
+        }
+    }, {
+        key: 'laneWidth',
+        value: function laneWidth() {
+            return this._laneWidth;
+        }
+    }, {
+        key: 'islandRadius',
+        value: function islandRadius() {
+            return this._islandRadius;
+        }
+    }, {
+        key: 'adherentRoadWidth',
+        value: function adherentRoadWidth() {
+            return this._adherentRoadSpecification.ingoingLanes * this._adherentRoadSpecification.lanesWidth + this._adherentRoadSpecification.outgoingLanes * this._adherentRoadSpecification.lanesWidth;
+        }
+    }, {
+        key: 'adherentLanesCount',
+        value: function adherentLanesCount() {
+            return this._adherentRoadSpecification.ingoingLanes + this._adherentRoadSpecification.outgoingLanes;
+        }
+    }, {
+        key: 'lengthOfLane',
+        value: function lengthOfLane(laneNumber) {
+            if (laneNumber >= this.lanesCount()) {
+                throw new Error("Incorrect lane number - 0 is the most inner, 1 is outer.");
+            }
+            return 2 * Math.PI * (this.islandRadius() + laneNumber * this.laneWidth());
+        }
+
+        /**
+         * Radius is counted to center of the lane
+         */
+    }, {
+        key: 'laneRadius',
+        value: function laneRadius(laneNumber) {
+            if (laneNumber >= this._innerRoad.lanesCount()) {
+                throw new Error("Incorrect lane number - 0 is the most inner, 1 is outer.");
+            }
+
+            return this.islandRadius() + this.laneWidth() * laneNumber + this.laneWidth() / 2;
+        }
+    }, {
+        key: 'allLanes',
+        value: function allLanes() {
+            var allLanes = [];
+            this._adherentRoads.forEach(function (adherentRoad) {
+                adherentRoad.allLanes().forEach(function (lane) {
+                    allLanes.push(lane);
+                });
+            });
+            this._innerRoad.allLanes().forEach(function (lane) {
+                allLanes.push(lane);
+            });
+            return allLanes;
+        }
+    }, {
+        key: 'innerRoadLanes',
+        value: function innerRoadLanes() {
+            return this._innerRoad.allLanes();
+        }
+    }, {
+        key: 'adherentRoads',
+        value: function adherentRoads() {
+            return this._adherentRoads;
+        }
+    }]);
+
+    return RoundaboutSpecification;
+})();
+
+var roundaboutBukowe = new RoundaboutSpecification(4.5, 2, 56 / 2, {
+    ingoingLanes: 2,
+    outgoingLanes: 2,
+    lanesWidth: 3.5
+});
+
+var roundaboutThreeLanes = new RoundaboutSpecification(4.5, 3, 56 / 2, {
+    ingoingLanes: 2,
+    outgoingLanes: 2,
+    lanesWidth: 3.5
+});
+
+exports.roundaboutBukowe = roundaboutBukowe;
+exports.roundaboutThreeLanes = roundaboutThreeLanes;
+
+},{"../../JsWhyYouNoImplement.js":5,"./AdherentRoad.js":12,"./Direction.js":13,"./InnerRoad.js":14,"./Lane.js":15}],17:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -785,19 +1293,52 @@ var _createClass = (function () { function defineProperties(target, props) { for
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Vehicle = (function () {
-    function Vehicle(lengthCells, maxSpeed) {
+    function Vehicle(lengthCells, maxSpeed, maxSpeedWhenTurning) {
         _classCallCheck(this, Vehicle);
 
         this._lengthCells = lengthCells;
         this._currentSpeed = 1;
         this._maxSpeed = maxSpeed;
-        this._id = Math.round(Math.random() * 1000000);
+        this._id = Math.round(Math.random() * 16777215);
+        this._currentCells = [];
+        this._maxSpeedWhenTurning = maxSpeedWhenTurning;
     }
 
     _createClass(Vehicle, [{
+        key: "maxSpeedWhenTurning",
+        value: function maxSpeedWhenTurning() {
+            return this._maxSpeedWhenTurning;
+        }
+    }, {
+        key: "setDestinationExit",
+        value: function setDestinationExit(destinationExit) {
+            this._destinationExit = destinationExit;
+        }
+    }, {
+        key: "destinationExit",
+        value: function destinationExit() {
+            return this._destinationExit;
+        }
+    }, {
+        key: "currentSpeed",
+        value: function currentSpeed() {
+            return this._currentSpeed;
+        }
+    }, {
         key: "moveToNextIteration",
-        value: function moveToNextIteration(cellsMap) {
-            if (cellsMap.nothingInFrontOf(this, this._currentSpeed)) {
+        value: function moveToNextIteration(cellsMap, cellsNeighbours) {
+            if (cellsNeighbours.canTakeExit(this)) {
+                cellsMap.takeExit(this);
+                return;
+            }
+
+            if (cellsNeighbours.isApproachingExit(this)) {
+                this._breakBy(1);
+                cellsMap.moveVehicleBy(this, this._currentSpeed);
+                return;
+            }
+
+            if (cellsMap.nothingInFrontOf(this, this._currentSpeed + 1)) {
                 if (!this._isMovingWithMaxSpeed()) {
                     this._accelerate();
                 }
@@ -807,6 +1348,40 @@ var Vehicle = (function () {
             }
 
             cellsMap.moveVehicleBy(this, this._currentSpeed);
+        }
+    }, {
+        key: "remove",
+        value: function remove() {
+            this._currentCells.forEach(function (cell) {
+                cell.setVehicle(null);
+            });
+            this._currentCells = [];
+        }
+    }, {
+        key: "moveToCells",
+        value: function moveToCells(cells) {
+            var _this = this;
+
+            if (cells.length != this.lengthCells()) {
+                throw new Error("Vehicle received invalid directions!");
+            }
+            this._currentCells.forEach(function (cell) {
+                cell.setVehicle(null);
+            });
+            cells.forEach(function (cell) {
+                cell.setVehicle(_this);
+            });
+            this._currentCells = cells;
+        }
+    }, {
+        key: "currentCells",
+        value: function currentCells() {
+            return this._currentCells;
+        }
+    }, {
+        key: "frontCell",
+        value: function frontCell() {
+            return this.currentCells()[0];
         }
     }, {
         key: "lengthCells",
@@ -836,6 +1411,13 @@ var Vehicle = (function () {
             this._currentSpeed = to;
         }
     }, {
+        key: "_breakBy",
+        value: function _breakBy(by) {
+            if (this._currentSpeed - by > 0) {
+                this._currentSpeed -= by;
+            }
+        }
+    }, {
         key: "_distanceFromPrecedingVehicle",
         value: function _distanceFromPrecedingVehicle(cellsMap) {
             var distanceNotEmpty = this._currentSpeed;
@@ -843,36 +1425,6 @@ var Vehicle = (function () {
                 distanceNotEmpty--;
             }
             return distanceNotEmpty;
-        }
-    }], [{
-        key: "newCar",
-        value: function newCar() {
-            return new Vehicle(2, 5);
-        }
-    }, {
-        key: "newMotorcycle",
-        value: function newMotorcycle() {
-            return new Vehicle(1, 5);
-        }
-    }, {
-        key: "newVan",
-        value: function newVan() {
-            return new Vehicle(3, 5);
-        }
-    }, {
-        key: "newMiniBus",
-        value: function newMiniBus() {
-            return new Vehicle(4, 3);
-        }
-    }, {
-        key: "newBus",
-        value: function newBus() {
-            return new Vehicle(5, 2);
-        }
-    }, {
-        key: "newTruck",
-        value: function newTruck() {
-            return new Vehicle(5, 2);
         }
     }]);
 
@@ -882,7 +1434,67 @@ var Vehicle = (function () {
 exports["default"] = Vehicle;
 module.exports = exports["default"];
 
-},{}],12:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var _VehicleJs = require('./Vehicle.js');
+
+var _VehicleJs2 = _interopRequireDefault(_VehicleJs);
+
+var VehicleFactory = (function () {
+    function VehicleFactory() {
+        _classCallCheck(this, VehicleFactory);
+    }
+
+    _createClass(VehicleFactory, null, [{
+        key: 'newCar',
+        value: function newCar() {
+            return new _VehicleJs2['default'](2, 5, 2);
+        }
+    }, {
+        key: 'newMotorcycle',
+        value: function newMotorcycle() {
+            return new _VehicleJs2['default'](1, 5, 2);
+        }
+    }, {
+        key: 'newVan',
+        value: function newVan() {
+            return new _VehicleJs2['default'](3, 5, 2);
+        }
+    }, {
+        key: 'newMiniBus',
+        value: function newMiniBus() {
+            return new _VehicleJs2['default'](4, 3, 2);
+        }
+    }, {
+        key: 'newBus',
+        value: function newBus() {
+            return new _VehicleJs2['default'](5, 2, 1);
+        }
+    }, {
+        key: 'newTruck',
+        value: function newTruck() {
+            return new _VehicleJs2['default'](5, 2, 1);
+        }
+    }]);
+
+    return VehicleFactory;
+})();
+
+exports['default'] = VehicleFactory;
+module.exports = exports['default'];
+
+},{"./Vehicle.js":17}],19:[function(require,module,exports){
 'use strict';
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
@@ -893,11 +1505,15 @@ var _GUICellsDrawerJs = require('./GUI/CellsDrawer.js');
 
 var _GUICellsDrawerJs2 = _interopRequireDefault(_GUICellsDrawerJs);
 
+var _GUITranslatorJs = require('./GUI/Translator.js');
+
+var _GUITranslatorJs2 = _interopRequireDefault(_GUITranslatorJs);
+
 var _GUIUnitConverterJs = require('./GUI/UnitConverter.js');
 
 var _GUIUnitConverterJs2 = _interopRequireDefault(_GUIUnitConverterJs);
 
-var _RoundaboutSpecificationsJs = require('./RoundaboutSpecifications.js');
+var _SimulationSpecificationRoundaboutSpecificationsJs = require('./Simulation/Specification/RoundaboutSpecifications.js');
 
 var _SimulationCellsMapJs = require('./Simulation/CellsMap.js');
 
@@ -905,7 +1521,11 @@ var _SimulationCellularAutomataJs = require('./Simulation/CellularAutomata.js');
 
 var _SimulationCellularAutomataJs2 = _interopRequireDefault(_SimulationCellularAutomataJs);
 
-var unitConverter = new _GUIUnitConverterJs2['default'](_RoundaboutSpecificationsJs.roundaboutBukowe.roundaboutDiameter() + _GUIRoundaboutDrawerJs.ADHERENT_ROAD_LENGTH * 2, Math.min(window.innerWidth, window.innerHeight));
+var _SimulationCellsNeighboursJs = require('./Simulation/CellsNeighbours.js');
+
+var _SimulationCellsNeighboursJs2 = _interopRequireDefault(_SimulationCellsNeighboursJs);
+
+var unitConverter = new _GUIUnitConverterJs2['default'](_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutThreeLanes.roundaboutDiameter() + _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutThreeLanes.adherentRoadLength() * 2, Math.min(window.innerWidth, window.innerHeight));
 
 var canvasElement = document.getElementById("canvas");
 var twojs = new Two({
@@ -914,19 +1534,22 @@ var twojs = new Two({
     autostart: true
 }).appendTo(canvasElement);
 
-var roundaboutBukoweCellsMap = new _SimulationCellsMapJs.CellsMap(_RoundaboutSpecificationsJs.roundaboutBukowe, unitConverter);
+var roundaboutBukoweCellsMap = new _SimulationCellsMapJs.CellsMap(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe, unitConverter);
 
-var roundaboutThreeLanesCellsMap = new _SimulationCellsMapJs.CellsMap(_RoundaboutSpecificationsJs.roundaboutThreeLanes, unitConverter);
+var roundaboutThreeLanesCellsMap = new _SimulationCellsMapJs.CellsMap(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutThreeLanes, unitConverter);
 
-var roundaboutDrawer = new _GUIRoundaboutDrawerJs.RoundaboutDrawer(_RoundaboutSpecificationsJs.roundaboutBukowe, unitConverter, twojs);
+var translator = new _GUITranslatorJs2['default'](_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe, unitConverter, twojs);
 
-var roundaboutCellsDrawer = new _GUICellsDrawerJs2['default'](_RoundaboutSpecificationsJs.roundaboutBukowe, roundaboutBukoweCellsMap, unitConverter, twojs);
+var roundaboutDrawer = new _GUIRoundaboutDrawerJs.RoundaboutDrawer(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe, unitConverter, twojs, translator);
 
-var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap);
+var roundaboutCellsDrawer = new _GUICellsDrawerJs2['default'](_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe, roundaboutBukoweCellsMap, unitConverter, twojs, translator);
+
+var cellsNeighbours = new _SimulationCellsNeighboursJs2['default'](roundaboutBukoweCellsMap.cellsCountOnLane(roundaboutBukoweCellsMap.outerLaneNumber()));
+var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap, cellsNeighbours);
 
 roundaboutDrawer.draw();
 setInterval(function () {
     cellularAutomata.nextIteration();
 }, 1000);
 
-},{"./GUI/CellsDrawer.js":1,"./GUI/RoundaboutDrawer.js":2,"./GUI/UnitConverter.js":3,"./RoundaboutSpecifications.js":5,"./Simulation/CellsMap.js":8,"./Simulation/CellularAutomata.js":9}]},{},[12]);
+},{"./GUI/CellsDrawer.js":1,"./GUI/RoundaboutDrawer.js":2,"./GUI/Translator.js":3,"./GUI/UnitConverter.js":4,"./Simulation/CellsMap.js":8,"./Simulation/CellsNeighbours.js":9,"./Simulation/CellularAutomata.js":10,"./Simulation/Specification/RoundaboutSpecifications.js":16}]},{},[19]);
