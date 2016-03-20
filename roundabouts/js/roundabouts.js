@@ -77,7 +77,7 @@ var CellsDrawer = (function () {
         value: function _cellFillColor(cell, cellElement) {
             if (!cell.isEmpty()) {
                 cellElement.fill = "#" + cell.vehicle().id().toString(16);
-                cellElement.stroke = "#FF0000";
+                cellElement.stroke = "#FFFFFF";
             } else {
                 cellElement.fill = "transparent";
             }
@@ -829,17 +829,17 @@ var CellularAutomata = (function () {
         _classCallCheck(this, CellularAutomata);
 
         var car1 = _VehicleFactoryJs2['default'].newCar();
-        car1.setDestinationExit('N');
+        car1.setDestinationExit('W');
         var car2 = _VehicleFactoryJs2['default'].newCar();
-        car2.setDestinationExit('N');
+        car2.setDestinationExit('W');
         var car3 = _VehicleFactoryJs2['default'].newCar();
-        car3.setDestinationExit('N');
+        car3.setDestinationExit('W');
         var car4 = _VehicleFactoryJs2['default'].newCar();
-        car4.setDestinationExit('N');
+        car4.setDestinationExit('W');
         var van = _VehicleFactoryJs2['default'].newVan();
-        van.setDestinationExit('N');
+        van.setDestinationExit('W');
         var truck = _VehicleFactoryJs2['default'].newTruck();
-        truck.setDestinationExit('N');
+        truck.setDestinationExit('W');
         this._vehicles = [car1, car2, car3, car4, truck, van];
         this._cellsMap = cellsMap;
         this._cellsMap.addVehicle(car1, 1, 0);
@@ -1332,14 +1332,8 @@ var Vehicle = (function () {
                 return;
             }
 
-            if (cellsNeighbours.isApproachingExit(this)) {
-                this._breakBy(1);
-                cellsMap.moveVehicleBy(this, this._currentSpeed);
-                return;
-            }
-
             if (cellsMap.nothingInFrontOf(this, this._currentSpeed + 1)) {
-                if (!this._isMovingWithMaxSpeed()) {
+                if (!this._isMovingWithMaxSpeed() && !this._isApproachingExit(cellsNeighbours)) {
                     this._accelerate();
                 }
             } else {
@@ -1347,6 +1341,11 @@ var Vehicle = (function () {
                 this._break(breakUpTo);
             }
 
+            if (this._isApproachingExit(cellsNeighbours)) {
+                if (this.currentSpeed() > this.maxSpeedWhenTurning()) {
+                    this._breakBy(1);
+                }
+            }
             cellsMap.moveVehicleBy(this, this._currentSpeed);
         }
     }, {
@@ -1425,6 +1424,11 @@ var Vehicle = (function () {
                 distanceNotEmpty--;
             }
             return distanceNotEmpty;
+        }
+    }, {
+        key: "_isApproachingExit",
+        value: function _isApproachingExit(cellsNeighbours) {
+            return cellsNeighbours.isApproachingExit(this) && !this.frontCell().parentLane().isExitLane();
         }
     }]);
 
