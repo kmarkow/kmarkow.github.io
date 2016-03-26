@@ -717,8 +717,7 @@ var CellsMap = (function (_Observable) {
             var oldVehicleCells = vehicle.currentCells();
             var sliceFrom = Math.max(0, vehicle.currentSpeed() - vehicle.lengthCells());
             var sliceTo = vehicle.currentSpeed();
-            //TODO: Hardcoded EXIT_1
-            var newVehicleCells = this._lanes[vehicle.destinationExit() + "_EXIT_1"].allCells().slice(sliceFrom, sliceTo).reverse();
+            var newVehicleCells = this._lanes[vehicle.destinationExit() + "_EXIT_" + vehicle.destinationExitLaneId().toString()].allCells().slice(sliceFrom, sliceTo).reverse();
             var newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(0, oldVehicleCells.length - newVehicleCells.length));
             vehicle.moveToCells(newVehicleCells);
         }
@@ -730,7 +729,7 @@ var CellsMap = (function (_Observable) {
 exports.CellsMap = CellsMap;
 exports.ExitRoadEnd = ExitRoadEnd;
 
-},{"./Cell.js":6,"./CellsLane.js":7,"./Observable.js":11,"./Vehicle.js":17}],9:[function(require,module,exports){
+},{"./Cell.js":6,"./CellsLane.js":7,"./Observable.js":12,"./Vehicle.js":19}],9:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -774,7 +773,7 @@ var CellsNeighbours = (function () {
         key: 'isApproachingExit',
         value: function isApproachingExit(vehicle) {
             //TODO: Base on rules check if can leave roundabout from the lane number
-            var closestDestinationExitOn = this._exits[vehicle.destinationExit()][0];
+            var closestDestinationExitOn = this._exits[vehicle.destinationExit()][vehicle.destinationExitLaneId()];
             var distanceFromExit = closestDestinationExitOn - vehicle.frontCell().number();
             var distanceTravelledIfStartsSlowingDown = (0, _JsWhyYouNoImplementJs.range)(vehicle.maxSpeedWhenTurning(), Math.max(0, vehicle.currentSpeed() - 1)).reduce(function (previousValue, currentValue) {
                 return previousValue + currentValue;
@@ -787,7 +786,7 @@ var CellsNeighbours = (function () {
     }, {
         key: 'canTakeExit',
         value: function canTakeExit(vehicle) {
-            var destinationExitCell = new _CellJs2['default'](this._exits[vehicle.destinationExit()][0]);
+            var destinationExitCell = new _CellJs2['default'](this._exits[vehicle.destinationExit()][vehicle.destinationExitLaneId()]);
             destinationExitCell.assignToLane(vehicle.frontCell().parentLane());
             return vehicle.currentCells().some(function (cell) {
                 return cell.equals(destinationExitCell);
@@ -801,7 +800,7 @@ var CellsNeighbours = (function () {
 exports['default'] = CellsNeighbours;
 module.exports = exports['default'];
 
-},{"../JsWhyYouNoImplement.js":5,"./Cell.js":6,"./Specification/Direction.js":13}],10:[function(require,module,exports){
+},{"../JsWhyYouNoImplement.js":5,"./Cell.js":6,"./Specification/Direction.js":15}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -829,17 +828,17 @@ var CellularAutomata = (function () {
         _classCallCheck(this, CellularAutomata);
 
         var car1 = _VehicleFactoryJs2['default'].newCar();
-        car1.setDestinationExit('W');
+        car1.setDestinationExit('N');
         var car2 = _VehicleFactoryJs2['default'].newCar();
-        car2.setDestinationExit('W');
+        car2.setDestinationExit('N');
         var car3 = _VehicleFactoryJs2['default'].newCar();
-        car3.setDestinationExit('W');
+        car3.setDestinationExit('N');
         var car4 = _VehicleFactoryJs2['default'].newCar();
-        car4.setDestinationExit('W');
+        car4.setDestinationExit('N');
         var van = _VehicleFactoryJs2['default'].newVan();
-        van.setDestinationExit('W');
+        van.setDestinationExit('N');
         var truck = _VehicleFactoryJs2['default'].newTruck();
-        truck.setDestinationExit('W');
+        truck.setDestinationExit('N');
         this._vehicles = [car1, car2, car3, car4, truck, van];
         this._cellsMap = cellsMap;
         this._cellsMap.addVehicle(car1, 1, 0);
@@ -878,7 +877,51 @@ var CellularAutomata = (function () {
 exports['default'] = CellularAutomata;
 module.exports = exports['default'];
 
-},{"./CellsMap.js":8,"./Vehicle.js":17,"./VehicleFactory.js":18}],11:[function(require,module,exports){
+},{"./CellsMap.js":8,"./Vehicle.js":19,"./VehicleFactory.js":20}],11:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, '__esModule', {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+var _SpecificationDirectionJs = require('./Specification/Direction.js');
+
+var _SpecificationDirectionJs2 = _interopRequireDefault(_SpecificationDirectionJs);
+
+var DrivingRules = function DrivingRules() {
+    _classCallCheck(this, DrivingRules);
+};
+
+var Driver = function Driver(drivingRules) {
+    _classCallCheck(this, Driver);
+};
+
+var DrivingSchool = (function () {
+    function DrivingSchool() {
+        _classCallCheck(this, DrivingSchool);
+    }
+
+    _createClass(DrivingSchool, null, [{
+        key: 'newRegularDriver',
+        value: function newRegularDriver() {
+            return new Driver(new DrivingRules());
+        }
+    }]);
+
+    return DrivingSchool;
+})();
+
+exports.Driver = Driver;
+exports.DrivingRules = DrivingRules;
+exports.DrivingSchool = DrivingSchool;
+
+},{"./Specification/Direction.js":15}],12:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -921,7 +964,36 @@ var Observable = (function () {
 exports["default"] = Observable;
 module.exports = exports["default"];
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var RandomNumberGenerator = (function () {
+    function RandomNumberGenerator() {
+        _classCallCheck(this, RandomNumberGenerator);
+    }
+
+    _createClass(RandomNumberGenerator, [{
+        key: "intFromTo",
+        value: function intFromTo(from, to) {
+            return Math.floor(Math.random() * (to - from + 1)) + from;
+        }
+    }]);
+
+    return RandomNumberGenerator;
+})();
+
+exports["default"] = RandomNumberGenerator;
+module.exports = exports["default"];
+
+},{}],14:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -974,7 +1046,6 @@ var AdherentRoad = (function () {
             var exitLanes = Array.from((0, _JsWhyYouNoImplementJs.range)(0, exitLanesCount), function (exitNumber) {
                 return new _LaneJs2['default'](direction.id() + '_EXIT_' + exitNumber, length, laneWidth, false);
             });
-            exitLanes.reverse();
 
             return new AdherentRoad(direction, length, entranceLanes, exitLanes);
         }
@@ -986,7 +1057,7 @@ var AdherentRoad = (function () {
 exports['default'] = AdherentRoad;
 module.exports = exports['default'];
 
-},{"../../JsWhyYouNoImplement.js":5,"./Lane.js":15}],13:[function(require,module,exports){
+},{"../../JsWhyYouNoImplement.js":5,"./Lane.js":17}],15:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -1026,7 +1097,7 @@ var Direction = (function () {
 exports["default"] = Direction;
 module.exports = exports["default"];
 
-},{}],14:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -1062,7 +1133,7 @@ var InnerRoad = (function () {
 exports["default"] = InnerRoad;
 module.exports = exports["default"];
 
-},{}],15:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -1116,7 +1187,7 @@ var Lane = (function () {
 exports['default'] = Lane;
 module.exports = exports['default'];
 
-},{}],16:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -1281,7 +1352,7 @@ var roundaboutThreeLanes = new RoundaboutSpecification(4.5, 3, 56 / 2, {
 exports.roundaboutBukowe = roundaboutBukowe;
 exports.roundaboutThreeLanes = roundaboutThreeLanes;
 
-},{"../../JsWhyYouNoImplement.js":5,"./AdherentRoad.js":12,"./Direction.js":13,"./InnerRoad.js":14,"./Lane.js":15}],17:[function(require,module,exports){
+},{"../../JsWhyYouNoImplement.js":5,"./AdherentRoad.js":14,"./Direction.js":15,"./InnerRoad.js":16,"./Lane.js":17}],19:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -1290,10 +1361,16 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+var _RandomNumberGeneratorJs = require('./RandomNumberGenerator.js');
+
+var _RandomNumberGeneratorJs2 = _interopRequireDefault(_RandomNumberGeneratorJs);
+
 var Vehicle = (function () {
-    function Vehicle(lengthCells, maxSpeed, maxSpeedWhenTurning) {
+    function Vehicle(lengthCells, maxSpeed, maxSpeedWhenTurning, driver) {
         _classCallCheck(this, Vehicle);
 
         this._lengthCells = lengthCells;
@@ -1302,6 +1379,10 @@ var Vehicle = (function () {
         this._id = Math.round(Math.random() * 16777215);
         this._currentCells = [];
         this._maxSpeedWhenTurning = maxSpeedWhenTurning;
+        this._driver = driver;
+        //if (driver.drivingRules.canTakeAnyLaneWhenLeavingFromRightLane() && this._isOnRightLane()) {
+        this._destinationExitLaneId = new _RandomNumberGeneratorJs2["default"]().intFromTo(0, 1);
+        //}
     }
 
     _createClass(Vehicle, [{
@@ -1323,6 +1404,16 @@ var Vehicle = (function () {
         key: "currentSpeed",
         value: function currentSpeed() {
             return this._currentSpeed;
+        }
+    }, {
+        key: "setDestinationExitLaneId",
+        value: function setDestinationExitLaneId(destinationExitLaneId) {
+            this._destinationExitLaneId = destinationExitLaneId;
+        }
+    }, {
+        key: "destinationExitLaneId",
+        value: function destinationExitLaneId() {
+            return this._destinationExitLaneId;
         }
     }, {
         key: "moveToNextIteration",
@@ -1438,7 +1529,7 @@ var Vehicle = (function () {
 exports["default"] = Vehicle;
 module.exports = exports["default"];
 
-},{}],18:[function(require,module,exports){
+},{"./RandomNumberGenerator.js":13}],20:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -1455,6 +1546,12 @@ var _VehicleJs = require('./Vehicle.js');
 
 var _VehicleJs2 = _interopRequireDefault(_VehicleJs);
 
+var _DrivingRulesJs = require('./DrivingRules.js');
+
+var _SpecificationDirectionJs = require('./Specification/Direction.js');
+
+var _SpecificationDirectionJs2 = _interopRequireDefault(_SpecificationDirectionJs);
+
 var VehicleFactory = (function () {
     function VehicleFactory() {
         _classCallCheck(this, VehicleFactory);
@@ -1462,33 +1559,51 @@ var VehicleFactory = (function () {
 
     _createClass(VehicleFactory, null, [{
         key: 'newCar',
-        value: function newCar() {
-            return new _VehicleJs2['default'](2, 5, 2);
+        value: function newCar(driver) {
+            if (!driver) {
+                driver = _DrivingRulesJs.DrivingSchool.newRegularDriver();
+            }
+            return new _VehicleJs2['default'](2, 5, 2, driver);
         }
     }, {
         key: 'newMotorcycle',
-        value: function newMotorcycle() {
-            return new _VehicleJs2['default'](1, 5, 2);
+        value: function newMotorcycle(driver) {
+            if (!driver) {
+                driver = _DrivingRulesJs.DrivingSchool.newRegularDriver();
+            }
+            return new _VehicleJs2['default'](1, 5, 2, driver);
         }
     }, {
         key: 'newVan',
-        value: function newVan() {
-            return new _VehicleJs2['default'](3, 5, 2);
+        value: function newVan(driver) {
+            if (!driver) {
+                driver = _DrivingRulesJs.DrivingSchool.newRegularDriver();
+            }
+            return new _VehicleJs2['default'](3, 5, 2, driver);
         }
     }, {
         key: 'newMiniBus',
-        value: function newMiniBus() {
-            return new _VehicleJs2['default'](4, 3, 2);
+        value: function newMiniBus(driver) {
+            if (!driver) {
+                driver = _DrivingRulesJs.DrivingSchool.newRegularDriver();
+            }
+            return new _VehicleJs2['default'](4, 3, 2, driver);
         }
     }, {
         key: 'newBus',
-        value: function newBus() {
-            return new _VehicleJs2['default'](5, 2, 1);
+        value: function newBus(driver) {
+            if (!driver) {
+                driver = _DrivingRulesJs.DrivingSchool.newRegularDriver();
+            }
+            return new _VehicleJs2['default'](5, 2, 1, driver);
         }
     }, {
         key: 'newTruck',
-        value: function newTruck() {
-            return new _VehicleJs2['default'](5, 2, 1);
+        value: function newTruck(driver) {
+            if (!driver) {
+                driver = _DrivingRulesJs.DrivingSchool.newRegularDriver();
+            }
+            return new _VehicleJs2['default'](5, 2, 1, driver);
         }
     }]);
 
@@ -1498,7 +1613,7 @@ var VehicleFactory = (function () {
 exports['default'] = VehicleFactory;
 module.exports = exports['default'];
 
-},{"./Vehicle.js":17}],19:[function(require,module,exports){
+},{"./DrivingRules.js":11,"./Specification/Direction.js":15,"./Vehicle.js":19}],21:[function(require,module,exports){
 'use strict';
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
@@ -1556,4 +1671,4 @@ setInterval(function () {
     cellularAutomata.nextIteration();
 }, 1000);
 
-},{"./GUI/CellsDrawer.js":1,"./GUI/RoundaboutDrawer.js":2,"./GUI/Translator.js":3,"./GUI/UnitConverter.js":4,"./Simulation/CellsMap.js":8,"./Simulation/CellsNeighbours.js":9,"./Simulation/CellularAutomata.js":10,"./Simulation/Specification/RoundaboutSpecifications.js":16}]},{},[19]);
+},{"./GUI/CellsDrawer.js":1,"./GUI/RoundaboutDrawer.js":2,"./GUI/Translator.js":3,"./GUI/UnitConverter.js":4,"./Simulation/CellsMap.js":8,"./Simulation/CellsNeighbours.js":9,"./Simulation/CellularAutomata.js":10,"./Simulation/Specification/RoundaboutSpecifications.js":18}]},{},[21]);
