@@ -544,6 +544,18 @@ var CellsLane = (function () {
             return this._cellsNextTo(cell, limitTo, this._allCells);
         }
     }, {
+        key: 'cellsNextToNumber',
+        value: function cellsNextToNumber(cellNumber, limitTo) {
+            var cell = this._allCells[cellNumber];
+            return this.cellsNextTo(cell, limitTo);
+        }
+    }, {
+        key: 'cellsPreviousToNumber',
+        value: function cellsPreviousToNumber(cellNumber, limitTo) {
+            var cell = this._allCells[cellNumber];
+            return this.cellsPreviousTo(cell, limitTo);
+        }
+    }, {
         key: 'cellsPreviousTo',
         value: function cellsPreviousTo(cell, limitTo) {
             return this._cellsNextTo(cell, limitTo, this._allCellsReversed);
@@ -564,6 +576,21 @@ var CellsLane = (function () {
             return this._allCells.slice(0, numberOfCells);
         }
     }, {
+        key: 'isExitLane',
+        value: function isExitLane() {
+            return this.id().toString().includes('EXIT');
+        }
+    }, {
+        key: 'isEntranceLane',
+        value: function isEntranceLane() {
+            return this.id().toString().includes('ENTRANCE');
+        }
+    }, {
+        key: 'isRoundaboutLane',
+        value: function isRoundaboutLane() {
+            return !this.isExitLane() && !this.isEntranceLane();
+        }
+    }, {
         key: '_cellsNextTo',
         value: function _cellsNextTo(cell, limitTo, arrayFrom) {
             var cellIndex = arrayFrom.findIndex(function (element) {
@@ -580,16 +607,6 @@ var CellsLane = (function () {
                 nextCells = nextCells.concat(arrayFrom.slice(0, missingCells));
             }
             return nextCells;
-        }
-    }, {
-        key: 'isExitLane',
-        value: function isExitLane() {
-            return !this._isRounded; //TODO: Take care of entrances also
-        }
-    }, {
-        key: 'isRoundaboutLane',
-        value: function isRoundaboutLane() {
-            return this._isRounded;
         }
     }]);
 
@@ -701,14 +718,10 @@ var CellsMap = (function (_Observable) {
             if (nextCells.length < cellsToMove && vehicle.frontCell().parentLane().isExitLane()) {
                 throw new ExitRoadEnd("End of exit road");
             }
-            var newVehicleFrontCell = nextCells.slice(-1)[0];
-            var newVehicleCells = newVehicleFrontCell.parentLane().cellsPreviousToInclusive(newVehicleFrontCell, vehicle.lengthCells());
+            var newVehicleCells = nextCells.reverse();
             var oldVehicleCells = vehicle.currentCells();
-            if (newVehicleCells.length != oldVehicleCells.length) {
-                //TODO: Hardcoded 2 for truck
-                newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(2, 2 + oldVehicleCells.length - newVehicleCells.length));
-            }
-            vehicle.moveToCells(newVehicleCells);
+            newVehicleCells = newVehicleCells.concat(oldVehicleCells);
+            vehicle.moveToCells(newVehicleCells.slice(0, vehicle.lengthCells()));
         }
     }, {
         key: 'addVehicle',
@@ -730,6 +743,15 @@ var CellsMap = (function (_Observable) {
             });
         }
     }, {
+        key: 'nothingOnRoundaboutFrom',
+        value: function nothingOnRoundaboutFrom(roundaboutLaneId, cellNumber, numberOfCellsToCheck) {
+            var roundaboutLane = this._lanes.get(roundaboutLaneId);
+            var nextCells = roundaboutLane.cellsNextToNumber(cellNumber, numberOfCellsToCheck);
+            return nextCells.every(function (cell) {
+                return cell.isEmpty();
+            });
+        }
+    }, {
         key: 'exitLaneEmpty',
         value: function exitLaneEmpty(vehicle, numberOfCellsToCheck) {
             var exitLaneId = vehicle.destinationExit() + "_EXIT_" + vehicle.destinationExitLaneId().toString();
@@ -742,15 +764,21 @@ var CellsMap = (function (_Observable) {
     }, {
         key: 'vehicleOnTheRight',
         value: function vehicleOnTheRight(vehicle) {
-            var laneIdOnTheRight = this._roundaboutSpecification.laneIdToTheRightOf(vehicle.currentLaneId());
+            var laneIdOnTheRight = null;
+            var cellsDiff = 0;
+            if (vehicle.frontCell().parentLane().isRoundaboutLane()) {
+                laneIdOnTheRight = this._roundaboutSpecification.laneIdToTheRightOf(vehicle.currentLaneId());
+                cellsDiff = 3;
+            } else if (vehicle.frontCell().parentLane().isEntranceLane()) {
+                laneIdOnTheRight = this._roundaboutSpecification.entranceLaneIdToTheRightOf(vehicle.currentLaneId());
+            }
             if (laneIdOnTheRight == null) {
                 return null;
             }
             var laneOnTheRight = this._lanes.get(laneIdOnTheRight);
-            var cellOnTheRightId = vehicle.frontCell().number() + 3;
+            var cellOnTheRightId = vehicle.frontCell().number() + cellsDiff;
             var cellOnTheRight = laneOnTheRight.allCells()[cellOnTheRightId];
             var cellsOnTheRight = laneOnTheRight.cellsPreviousToInclusive(cellOnTheRight, 4);
-
             var cellWithAVehicle = cellsOnTheRight.find(function (cell) {
                 if (cell.vehicle()) {
                     return true;
@@ -764,13 +792,50 @@ var CellsMap = (function (_Observable) {
             return null;
         }
     }, {
+        key: 'vehiclesOnTheLeft',
+        value: function vehiclesOnTheLeft(vehicle, cellsNeighbours) {
+            var _this2 = this;
+
+            var roundaboutLanes = this._roundaboutSpecification.lanesNumbers(); // [0,1]
+            var vehiclesOnTheLeft = new Map();
+            roundaboutLanes.forEach(function (laneId) {
+                var lane = _this2._lanes.get(laneId); // CellsLane
+                var cellAheadId = cellsNeighbours.firstCellNumberOnEntrance(vehicle.entranceRoadId(), vehicle.entranceLaneId(), laneId);
+                var cellsOnTheLeft = lane.cellsPreviousToNumber(cellAheadId, 5);
+                var cellWithAVehicle = cellsOnTheLeft.find(function (cell) {
+                    if (cell.vehicle()) {
+                        return true;
+                    }
+                    return false;
+                });
+                if (cellWithAVehicle) {
+                    vehiclesOnTheLeft.set(laneId, cellWithAVehicle.vehicle());
+                }
+            });
+            return vehiclesOnTheLeft;
+        }
+    }, {
         key: 'takeExit',
         value: function takeExit(vehicle) {
             var oldVehicleCells = vehicle.currentCells();
             var sliceFrom = Math.max(0, vehicle.currentSpeed() - vehicle.lengthCells());
             var sliceTo = vehicle.currentSpeed();
             var newVehicleCells = this._lanes.get(vehicle.destinationExit() + "_EXIT_" + vehicle.destinationExitLaneId().toString()).allCells().slice(sliceFrom, sliceTo).reverse();
-            var newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(0, oldVehicleCells.length - newVehicleCells.length));
+            var newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(0, Math.max(0, oldVehicleCells.length - newVehicleCells.length)));
+            vehicle.moveToCells(newVehicleCells);
+        }
+    }, {
+        key: 'takeEntrance',
+        value: function takeEntrance(vehicle, cellsNeighbours) {
+            var roundaboutLaneId = vehicle.roundaboutLaneId();
+            var firstCellOnRoundaboutNumber = cellsNeighbours.firstCellNumberOnEntrance(vehicle.entranceRoadId(), vehicle.entranceLaneId(), roundaboutLaneId);
+            var roundaboutLane = this._lanes.get(roundaboutLaneId);
+            var sliceFrom = Math.max(0, vehicle.currentSpeed() - vehicle.lengthCells());
+            var sliceTo = vehicle.currentSpeed();
+            var newVehicleCells = roundaboutLane.cellsNextToNumber(firstCellOnRoundaboutNumber, vehicle.currentSpeed());
+            newVehicleCells = newVehicleCells.slice(sliceFrom, sliceTo).reverse();
+            var oldVehicleCells = vehicle.currentCells();
+            newVehicleCells = newVehicleCells.concat(oldVehicleCells.slice(0, oldVehicleCells.length - newVehicleCells.length));
             vehicle.moveToCells(newVehicleCells);
         }
     }]);
@@ -805,10 +870,13 @@ var _SpecificationDirectionJs2 = _interopRequireDefault(_SpecificationDirectionJ
 var _JsWhyYouNoImplementJs = require('../JsWhyYouNoImplement.js');
 
 var CellsNeighbours = (function () {
-    function CellsNeighbours(laneCellsCounts) {
+    function CellsNeighbours(roundaboutLaneCellsCount, entranceLanesCount, entranceLaneCellsCount) {
+        var _this = this;
+
         _classCallCheck(this, CellsNeighbours);
 
-        this._exits = Array.from(laneCellsCounts, function (laneCellsCount) {
+        this._maxCellIdOnEntrance = entranceLaneCellsCount - 1;
+        this._exits = Array.from(roundaboutLaneCellsCount, function (laneCellsCount) {
             var roadEvery = Math.floor(laneCellsCount / 4);
             var firstRoadAt = roadEvery - 3;
             var exits = new Map();
@@ -817,6 +885,19 @@ var CellsNeighbours = (function () {
             exits.set('S', [firstRoadAt + roadEvery * 2, firstRoadAt + 1 + roadEvery * 2]);
             exits.set('E', [firstRoadAt + roadEvery * 3, firstRoadAt + 1 + roadEvery * 3]);
             return exits;
+        });
+        this._entrances = new Map();
+        ["N", "W", "S", "E"].forEach(function (direction, multiplier) {
+            roundaboutLaneCellsCount.forEach(function (laneCellsCount, roundaboutLaneId) {
+                var roadEvery = Math.floor(laneCellsCount / 4);
+                (0, _JsWhyYouNoImplementJs.range)(0, entranceLanesCount).forEach(function (entranceLaneId) {
+                    var value = roadEvery * (multiplier + 1) - entranceLaneId + 1;
+                    if (value >= laneCellsCount) {
+                        value = value - laneCellsCount;
+                    }
+                    _this._entrances.set(direction + ' ' + entranceLaneId + ' ' + roundaboutLaneId, value);
+                });
+            });
         });
     }
 
@@ -837,6 +918,18 @@ var CellsNeighbours = (function () {
             return false;
         }
     }, {
+        key: 'isApproachingRoundabout',
+        value: function isApproachingRoundabout(vehicle) {
+            var distanceFromEntrance = this._maxCellIdOnEntrance - vehicle.frontCell().number();
+            var distanceTravelledIfStartsSlowingDown = (0, _JsWhyYouNoImplementJs.range)(vehicle.maxSpeedWhenTurning(), Math.max(0, vehicle.currentSpeed() - 1)).reduce(function (previousValue, currentValue) {
+                return previousValue + currentValue;
+            }, 0);
+            if (distanceTravelledIfStartsSlowingDown >= distanceFromEntrance && distanceFromEntrance > 0) {
+                return true;
+            }
+            return false;
+        }
+    }, {
         key: 'approachedExit',
         value: function approachedExit(vehicle) {
             var destinationExitCellId = this._destinationExitCellIdFor(vehicle);
@@ -848,6 +941,16 @@ var CellsNeighbours = (function () {
             return vehicle.currentCells().some(function (cell) {
                 return cell.equals(destinationExitCell);
             });
+        }
+    }, {
+        key: 'approachedEntrance',
+        value: function approachedEntrance(vehicle) {
+            return vehicle.frontCell().parentLane().isEntranceLane() && vehicle.frontCell().number() == this._maxCellIdOnEntrance;
+        }
+    }, {
+        key: 'firstCellNumberOnEntrance',
+        value: function firstCellNumberOnEntrance(entranceRoadId, entranceLaneId, roundaboutLaneId) {
+            return this._entrances.get(entranceRoadId + ' ' + entranceLaneId + ' ' + roundaboutLaneId);
         }
     }, {
         key: '_destinationExitCellIdFor',
@@ -908,19 +1011,25 @@ var CellularAutomata = (function () {
         this._cellsNeighbours = cellsNeighbours;
         this._drivingRules = drivingRules;
         var randomNumberGenerator = new _RandomNumberGeneratorJs2['default']();
-        this._vehicles = [_VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules)];
+        this._vehicles = [_VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules)];
         this._vehicles.forEach(function (vehicle) {
             vehicle.setDestinationExit(_SpecificationDirectionJs2['default'].newNorth());
             vehicle.setDestinationExitLaneId(randomNumberGenerator.intFromTo(0, 1));
         });
+
+        var directions = _SpecificationDirectionJs2['default'].allDirections();
         this._vehicles.forEach(function (vehicle) {
-            var laneId = randomNumberGenerator.intFromTo(0, 1);
+            var entranceRoad = directions[Math.floor(Math.random() * directions.length)];
+            var entranceLaneId = randomNumberGenerator.intFromTo(0, 1);
+            var roundaboutLaneId = randomNumberGenerator.intFromTo(0, 1);
+            var exitRoad = directions[Math.floor(Math.random() * directions.length)];
             var exitLaneId = randomNumberGenerator.intFromTo(0, 1);
-            if (laneId == 0) {
-                exitLaneId = 1;
-            }
+            vehicle.setEntranceRoad(entranceRoad);
+            vehicle.setEntranceLaneId(entranceLaneId);
+            vehicle.setRoundaboutLaneId(roundaboutLaneId);
+            vehicle.setDestinationExit(exitRoad);
             vehicle.setDestinationExitLaneId(exitLaneId);
-            _this._cellsMap.addVehicle(vehicle, laneId, randomNumberGenerator.intFromTo(0, 69));
+            _this._cellsMap.addVehicle(vehicle, entranceRoad.id() + '_ENTRANCE_' + entranceLaneId, randomNumberGenerator.intFromTo(vehicle.lengthCells(), 13 - vehicle.lengthCells()));
         });
     }
 
@@ -952,17 +1061,17 @@ exports['default'] = CellularAutomata;
 module.exports = exports['default'];
 
 },{"./CellsMap.js":8,"./RandomNumberGenerator.js":13,"./Specification/Direction.js":15,"./Vehicle.js":19,"./VehicleFactory.js":20}],11:[function(require,module,exports){
-'use strict';
+"use strict";
 
-Object.defineProperty(exports, '__esModule', {
+Object.defineProperty(exports, "__esModule", {
     value: true
 });
 
-var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
 
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var _SpecificationDirectionJs = require('./Specification/Direction.js');
 
@@ -976,7 +1085,7 @@ var ExitRule1 = (function () {
     }
 
     _createClass(ExitRule1, [{
-        key: 'shouldYieldTo',
+        key: "shouldYieldTo",
         value: function shouldYieldTo(vehicle, another_vehicle) {
             if (this._isOnOuterLane(vehicle)) {
                 return false;
@@ -995,28 +1104,76 @@ var ExitRule1 = (function () {
             }
         }
     }, {
-        key: '_vehiclesLeaveAtTheSameExit',
+        key: "_vehiclesLeaveAtTheSameExit",
         value: function _vehiclesLeaveAtTheSameExit(vehicle, another_vehicle) {
             return vehicle.destinationExit() == another_vehicle.destinationExit();
         }
     }, {
-        key: '_vehiclesTakeTheSameLane',
+        key: "_vehiclesTakeTheSameLane",
         value: function _vehiclesTakeTheSameLane(vehicle, another_vehicle) {
             return vehicle.destinationExitLaneId() == another_vehicle.destinationExitLaneId();
         }
     }, {
-        key: '_isOnMiddleLane',
+        key: "_isOnMiddleLane",
         value: function _isOnMiddleLane(vehicle) {
             return !this._isOnOuterLane(vehicle);
         }
     }, {
-        key: '_isOnOuterLane',
+        key: "_isOnOuterLane",
         value: function _isOnOuterLane(vehicle) {
             return vehicle.currentLaneId() + 1 == this._numberOfRoundaboutLanes;
         }
     }]);
 
     return ExitRule1;
+})();
+
+var EntranceRule1 = (function () {
+    function EntranceRule1(numberOfRoundaboutLanes) {
+        _classCallCheck(this, EntranceRule1);
+
+        this._numberOfRoundaboutLanes = numberOfRoundaboutLanes;
+    }
+
+    _createClass(EntranceRule1, [{
+        key: "shouldYieldTo",
+        value: function shouldYieldTo(vehicle, another_vehicle) {
+            if (this._isEnteringRoundabout(vehicle) && this._isOnRoundabout(another_vehicle)) {
+                return this._isCrossingRoundaboutLaneOf(vehicle, another_vehicle);
+            }
+            if (this._bothAreEntering(vehicle, another_vehicle)) {
+                return this._isOnTheLeftOf(vehicle, another_vehicle) && vehicle.roundaboutLaneId() >= another_vehicle.roundaboutLaneId();
+            }
+            throw new Error("Entrance Rule 1 unknown situation");
+        }
+    }, {
+        key: "_bothAreEntering",
+        value: function _bothAreEntering(vehicle, another_vehicle) {
+            return vehicle.frontCell().parentLane().isEntranceLane() && another_vehicle.frontCell().parentLane().isEntranceLane();
+        }
+    }, {
+        key: "_isOnRoundabout",
+        value: function _isOnRoundabout(vehicle) {
+            return vehicle.frontCell().parentLane().isRoundaboutLane();
+        }
+    }, {
+        key: "_isEnteringRoundabout",
+        value: function _isEnteringRoundabout(vehicle) {
+            return vehicle.frontCell().parentLane().isEntranceLane();
+        }
+    }, {
+        key: "_isCrossingRoundaboutLaneOf",
+        value: function _isCrossingRoundaboutLaneOf(vehicle, another_vehicle) {
+            return vehicle.roundaboutLaneId() <= another_vehicle.roundaboutLaneId();
+        }
+    }, {
+        key: "_isOnTheLeftOf",
+        value: function _isOnTheLeftOf(vehicle, another_vehicle) {
+            return vehicle.entranceLaneId() > another_vehicle.entranceLaneId();
+        }
+    }]);
+
+    return EntranceRule1;
 })();
 
 var DrivingRules = (function () {
@@ -1028,9 +1185,9 @@ var DrivingRules = (function () {
     }
 
     _createClass(DrivingRules, null, [{
-        key: 'newRules1',
+        key: "newRules1",
         value: function newRules1(roundaboutLanesCount) {
-            return new DrivingRules(null, new ExitRule1(roundaboutLanesCount));
+            return new DrivingRules(new EntranceRule1(roundaboutLanesCount), new ExitRule1(roundaboutLanesCount));
         }
     }]);
 
@@ -1039,6 +1196,7 @@ var DrivingRules = (function () {
 
 exports.DrivingRules = DrivingRules;
 exports.ExitRule1 = ExitRule1;
+exports.EntranceRule1 = EntranceRule1;
 
 },{"./Specification/Direction.js":15}],12:[function(require,module,exports){
 "use strict";
@@ -1154,7 +1312,7 @@ var AdherentRoad = (function () {
     }, {
         key: 'allLanes',
         value: function allLanes() {
-            return this._exitsLanes; //this._entrancesLanes.concat(this._exitsLanes); //TODO: Przywrócić jak dodane będzie rysowanie wjazdów
+            return this._exitsLanes.concat(this._entrancesLanes);
         }
     }], [{
         key: 'newRoad',
@@ -1162,6 +1320,7 @@ var AdherentRoad = (function () {
             var entranceLanes = Array.from((0, _JsWhyYouNoImplementJs.range)(0, entrancesLanesCount), function (entranceNumber) {
                 return new _LaneJs2['default'](direction.id() + '_ENTRANCE_' + entranceNumber, length, laneWidth, false);
             });
+            entranceLanes.reverse();
             var exitLanes = Array.from((0, _JsWhyYouNoImplementJs.range)(0, exitLanesCount), function (exitNumber) {
                 return new _LaneJs2['default'](direction.id() + '_EXIT_' + exitNumber, length, laneWidth, false);
             });
@@ -1394,7 +1553,7 @@ var RoundaboutSpecification = (function () {
     }, {
         key: 'adherentRoadLength',
         value: function adherentRoadLength() {
-            return 35; // 25 meters
+            return 35; // 35 meters
         }
     }, {
         key: 'lanesWidth',
@@ -1485,6 +1644,14 @@ var RoundaboutSpecification = (function () {
             }
             return null;
         }
+    }, {
+        key: 'entranceLaneIdToTheRightOf',
+        value: function entranceLaneIdToTheRightOf(laneId) {
+            if (laneId.includes("_ENTRANCE_1")) {
+                return laneId.replace("_ENTRANCE_1", "_ENTRANCE_0");
+            }
+            return null;
+        }
     }]);
 
     return RoundaboutSpecification;
@@ -1571,10 +1738,91 @@ var Vehicle = (function () {
             return this._destinationExitLaneId;
         }
     }, {
+        key: "entranceLaneId",
+        value: function entranceLaneId() {
+            return this._entranceLaneId;
+        }
+    }, {
+        key: "roundaboutLaneId",
+        value: function roundaboutLaneId() {
+            return this._roundaboutLaneId;
+        }
+    }, {
+        key: "entranceRoadId",
+        value: function entranceRoadId() {
+            return this._entranceRoadId.id();
+        }
+    }, {
+        key: "setEntranceLaneId",
+        value: function setEntranceLaneId(entranceLaneId) {
+            this._entranceLaneId = entranceLaneId;
+        }
+    }, {
+        key: "setRoundaboutLaneId",
+        value: function setRoundaboutLaneId(roundaboutLaneId) {
+            this._roundaboutLaneId = roundaboutLaneId;
+        }
+    }, {
+        key: "setEntranceRoad",
+        value: function setEntranceRoad(entranceRoadId) {
+            this._entranceRoadId = entranceRoadId;
+        }
+    }, {
         key: "moveToNextIteration",
         value: function moveToNextIteration(cellsMap, cellsNeighbours) {
+            //Entering roundabout
+            if (cellsNeighbours.approachedEntrance(this)) {
+                var vehiclesOnTheLeft = cellsMap.vehiclesOnTheLeft(this, cellsNeighbours);
+                var _iteratorNormalCompletion = true;
+                var _didIteratorError = false;
+                var _iteratorError = undefined;
+
+                try {
+                    for (var _iterator = vehiclesOnTheLeft.values()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                        var vehicle = _step.value;
+
+                        if (this._drivingRules.entranceRules.shouldYieldTo(this, vehicle)) {
+                            this._stop();
+                            //console.log("Stopping, yielding to vehicle on the left");
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    _didIteratorError = true;
+                    _iteratorError = err;
+                } finally {
+                    try {
+                        if (!_iteratorNormalCompletion && _iterator["return"]) {
+                            _iterator["return"]();
+                        }
+                    } finally {
+                        if (_didIteratorError) {
+                            throw _iteratorError;
+                        }
+                    }
+                }
+
+                var vehicleOnTheRight = cellsMap.vehicleOnTheRight(this);
+                if (vehicleOnTheRight && this._drivingRules.entranceRules.shouldYieldTo(this, vehicleOnTheRight)) {
+                    this._stop();
+                    //console.log("Stopping, yielding to vehicle on the right");
+                    return;
+                }
+
+                var firstCellOnRoundabout = cellsNeighbours.firstCellNumberOnEntrance(this.entranceRoadId(), this.entranceLaneId(), this.roundaboutLaneId());
+                var nothingInFrontOnRoundabout = cellsMap.nothingOnRoundaboutFrom(this.roundaboutLaneId(), firstCellOnRoundabout, this.maxSpeedWhenTurning());
+                if (this._hasStopped() && nothingInFrontOnRoundabout) {
+                    this._accelerate(this.maxSpeedWhenTurning());
+                    //console.log("Accelerating to enter roundabout ", this.currentSpeed());
+                }
+                //console.log("Taking entrance");
+                cellsMap.takeEntrance(this, cellsNeighbours);
+                return;
+            }
+
             //Taking exit
             if (cellsNeighbours.approachedExit(this)) {
+                //console.log("Approached exit");
                 if (!cellsMap.exitLaneEmpty(this, this._currentSpeed)) {
                     this._stop();
                     return;
@@ -1591,21 +1839,24 @@ var Vehicle = (function () {
                 return;
             }
 
-            //Going around roundabout
+            //Going straight on entrance lane, exit lane and roundabout
             if (cellsMap.nothingInFrontOf(this, this._currentSpeed + 1)) {
-                if (!this._isMovingWithMaxSpeed() && !this._isApproachingExit(cellsNeighbours)) {
+                if (!this._isMovingWithMaxSpeed() && !this._isApproachingExit(cellsNeighbours) && !this._isApproachingRoundabout(cellsNeighbours)) {
                     this._accelerate();
+                    //console.log("Accelerating nothing in front of me and not approaching ", this.currentSpeed());
                 }
             } else {
-                var breakUpTo = this._distanceFromPrecedingVehicle(cellsMap);
-                this._break(breakUpTo);
-            }
+                    var breakUpTo = this._distanceFromPrecedingVehicle(cellsMap);
+                    this._break(breakUpTo);
+                    //console.log("Breaking vehicle ahead", this.currentSpeed());
+                }
 
-            if (this._isApproachingExit(cellsNeighbours)) {
+            if (this._isApproachingExit(cellsNeighbours) || this._isApproachingRoundabout(cellsNeighbours)) {
                 if (this.currentSpeed() > this.maxSpeedWhenTurning()) {
                     this._breakBy(1);
                 }
             }
+            //console.log("Will move by ", this.currentSpeed());
             cellsMap.moveVehicleBy(this, this._currentSpeed);
         }
     }, {
@@ -1702,7 +1953,12 @@ var Vehicle = (function () {
     }, {
         key: "_isApproachingExit",
         value: function _isApproachingExit(cellsNeighbours) {
-            return cellsNeighbours.isApproachingExit(this) && !this.frontCell().parentLane().isExitLane();
+            return cellsNeighbours.isApproachingExit(this) && this.frontCell().parentLane().isRoundaboutLane();
+        }
+    }, {
+        key: "_isApproachingRoundabout",
+        value: function _isApproachingRoundabout(cellsNeighbours) {
+            return cellsNeighbours.isApproachingRoundabout(this) && this.frontCell().parentLane().isEntranceLane();
         }
     }]);
 
@@ -1828,7 +2084,7 @@ var roundaboutDrawer = new _GUIRoundaboutDrawerJs.RoundaboutDrawer(_SimulationSp
 
 var roundaboutCellsDrawer = new _GUICellsDrawerJs2['default'](_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe, roundaboutBukoweCellsMap, unitConverter, twojs, translator);
 
-var cellsNeighbours = new _SimulationCellsNeighboursJs2['default'](roundaboutBukoweCellsMap.cellsCountsOnInnerRoadLanes());
+var cellsNeighbours = new _SimulationCellsNeighboursJs2['default'](roundaboutBukoweCellsMap.cellsCountsOnInnerRoadLanes(), _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2, unitConverter.metersAsCells(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentRoadLength()));
 
 var drivingRules = _SimulationDrivingRulesJs.DrivingRules.newRules1(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.lanesCount());
 var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap, cellsNeighbours, drivingRules);
