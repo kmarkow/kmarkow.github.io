@@ -1045,24 +1045,39 @@ var CellularAutomata = (function () {
         this._drivingRules = drivingRules;
         this._vehicles = [];
 
-        var vehicles = [_VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules)];
-        //vehicles[0].setPath(new Path(
-        //    Direction.newNorth(),
-        //    1,
-        //    1,
-        //    Direction.newWest(),
-        //    1
-        //));
-        //vehicles[1].setPath(new Path(
-        //    Direction.newNorth(),
-        //    0,
-        //    0,
-        //    Direction.newWest(),
-        //    1
-        //));
-        vehicles.forEach(function (vehicle) {
-            vehicle.setPath(drivingRules.randomPath());
-        });
+        var vehicles = [_VehicleFactoryJs2['default'].newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newCar(this._drivingRules),
+        //VehicleFactory.newVan(this._drivingRules),
+        //VehicleFactory.newVan(this._drivingRules),
+        //VehicleFactory.newVan(this._drivingRules),
+        //VehicleFactory.newTruck(this._drivingRules),
+        //VehicleFactory.newTruck(this._drivingRules),
+        //VehicleFactory.newTruck(this._drivingRules),
+        //VehicleFactory.newTruck(this._drivingRules),
+        //VehicleFactory.newTruck(this._drivingRules),
+        _VehicleFactoryJs2['default'].newTruck(this._drivingRules)];
+        vehicles[0].setPath(new _PathJs2['default'](_SpecificationDirectionJs2['default'].newNorth(), 1, 0, _SpecificationDirectionJs2['default'].newWest(), 1));
+        vehicles[1].setPath(new _PathJs2['default'](_SpecificationDirectionJs2['default'].newNorth(), 0, 1, _SpecificationDirectionJs2['default'].newWest(), 0));
+        //vehicles.forEach(vehicle => {
+        //    vehicle.setPath(drivingRules.randomPath());
+        //});
 
         this._vehiclesQueues = new Map();
         _SpecificationDirectionJs2['default'].allDirections().forEach(function (entranceRoadDirection) {
