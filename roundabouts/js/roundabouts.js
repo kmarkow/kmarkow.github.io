@@ -1029,6 +1029,11 @@ var VehicleQueue = (function () {
         value: function nextVehicle() {
             return this._vehicles.pop();
         }
+    }, {
+        key: 'isEmpty',
+        value: function isEmpty() {
+            return this._vehicles.length == 0;
+        }
     }]);
 
     return VehicleQueue;
@@ -1040,26 +1045,16 @@ var CellularAutomata = (function () {
 
         _classCallCheck(this, CellularAutomata);
 
+        this._iterations = 0;
         this._cellsMap = cellsMap;
         this._cellsNeighbours = cellsNeighbours;
         this._drivingRules = drivingRules;
         this._vehicles = [];
 
-        var vehicles = [_VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newCar(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newVan(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules), _VehicleFactoryJs2['default'].newTruck(this._drivingRules)];
-        //vehicles[0].setPath(new Path(
-        //    Direction.newNorth(),
-        //    1,
-        //    1,
-        //    Direction.newWest(),
-        //    1
-        //));
-        //vehicles[1].setPath(new Path(
-        //    Direction.newNorth(),
-        //    0,
-        //    0,
-        //    Direction.newWest(),
-        //    1
-        //));
+        var vehicles = [];
+        (0, _JsWhyYouNoImplementJs.range)(0, 500).forEach(function () {
+            vehicles.push(_VehicleFactoryJs2['default'].newCar(_this._drivingRules));
+        });
         vehicles.forEach(function (vehicle) {
             vehicle.setPath(drivingRules.randomPath());
         });
@@ -1081,9 +1076,24 @@ var CellularAutomata = (function () {
     _createClass(CellularAutomata, [{
         key: 'nextIteration',
         value: function nextIteration() {
+            this._iterations++;
             this._moveVehicles();
             this._addVehiclesFromQueue();
             this._cellsMap.notifyAll();
+        }
+    }, {
+        key: 'hasFinished',
+        value: function hasFinished() {
+            var allQueuesEmpty = Array.from(this._vehiclesQueues.values()).every(function (queue) {
+                return queue.isEmpty();
+            });
+            var allVehiclesLeft = this._vehicles.length == 0;
+            return allVehiclesLeft && allQueuesEmpty;
+        }
+    }, {
+        key: 'iterations',
+        value: function iterations() {
+            return this._iterations;
         }
     }, {
         key: '_moveVehicles',
@@ -2111,7 +2121,7 @@ var Vehicle = (function () {
 
             //Taking exit
             if (cellsNeighbours.approachedExit(this)) {
-                if (!cellsMap.exitLaneEmpty(this, this._currentSpeed)) {
+                if (!cellsMap.exitLaneEmpty(this, this.maxSpeedWhenTurning())) {
                     this._stop();
                     return;
                 }
@@ -2389,8 +2399,82 @@ var drivingRules = _SimulationDrivingRulesJs.DrivingRules.newRules4(_SimulationS
 var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap, cellsNeighbours, drivingRules, _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2);
 
 roundaboutDrawer.draw();
-setInterval(function () {
+function nextIteration() {
     cellularAutomata.nextIteration();
-}, 1000);
+    if (cellularAutomata.hasFinished()) {
+        console.log("Finished simulation, ", cellularAutomata.iterations());
+        return;
+    }
+    setTimeout(function () {
+        nextIteration();
+    }, 100);
+};
+nextIteration();
+
+//import {RoundaboutDrawer} from './GUI/RoundaboutDrawer.js';
+//import CellsDrawer from './GUI/CellsDrawer.js';
+//import Translator from './GUI/Translator.js';
+//import UnitConverter from './GUI/UnitConverter.js';
+//import {roundaboutBukowe, roundaboutThreeLanes} from './Simulation/Specification/RoundaboutSpecifications.js';
+//import {CellsMap} from './Simulation/CellsMap.js';
+//import CellularAutomata from './Simulation/CellularAutomata.js';
+//import CellsNeighbours from './Simulation/CellsNeighbours.js';
+//import {DrivingRules} from './Simulation/DrivingRules.js';
+//import {range} from './JsWhyYouNoImplement.js';
+//
+//let unitConverter = new UnitConverter(
+//    roundaboutBukowe.roundaboutDiameter() + roundaboutBukowe.adherentRoadLength() * 2,
+//    Math.min(200, 200)
+//);
+//
+//let roundaboutBukoweCellsMap = new CellsMap(
+//    roundaboutBukowe,
+//    unitConverter
+//);
+//
+//var cellsNeighbours = new CellsNeighbours(
+//    roundaboutBukoweCellsMap.cellsCountsOnInnerRoadLanes(),
+//    roundaboutBukowe.adherentLanesCount() / 2,
+//    unitConverter.metersAsCells(roundaboutBukowe.adherentRoadLength())
+//);
+//
+//
+//let drivingRules = [
+//    DrivingRules.newRules1(
+//        roundaboutBukowe.lanesCount(),
+//        roundaboutBukowe.adherentLanesCount()
+//    ),
+//    DrivingRules.newRules2(
+//        roundaboutBukowe.lanesCount(),
+//        roundaboutBukowe.adherentLanesCount()
+//    ),
+//    DrivingRules.newRules3(
+//        roundaboutBukowe.lanesCount(),
+//        roundaboutBukowe.adherentLanesCount()
+//    ),
+//    DrivingRules.newRules4(
+//        roundaboutBukowe.lanesCount(),
+//        roundaboutBukowe.adherentLanesCount()
+//    )
+//];
+//drivingRules.forEach(drivingRule => {
+//
+//    var results = [];
+//    range(0, 20).forEach(() => {
+//        let cellularAutomata = new CellularAutomata(
+//            roundaboutBukoweCellsMap,
+//            cellsNeighbours,
+//            drivingRule,
+//            roundaboutBukowe.adherentLanesCount() / 2
+//        );
+//
+//        while (!cellularAutomata.hasFinished()) {
+//            cellularAutomata.nextIteration();
+//        }
+//        results.push(cellularAutomata.iterations());
+//    });
+//
+//    console.log("Finished simulation: ",  results.join(","));
+//});
 
 },{"./GUI/CellsDrawer.js":1,"./GUI/RoundaboutDrawer.js":2,"./GUI/Translator.js":3,"./GUI/UnitConverter.js":4,"./Simulation/CellsMap.js":8,"./Simulation/CellsNeighbours.js":9,"./Simulation/CellularAutomata.js":10,"./Simulation/DrivingRules.js":11,"./Simulation/Specification/RoundaboutSpecifications.js":21}]},{},[24]);
