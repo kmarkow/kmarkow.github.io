@@ -48,6 +48,7 @@ var CellsDrawer = (function () {
         key: "_clearDrawnElements",
         value: function _clearDrawnElements() {
             this._two.remove(this._drawnCells);
+            this._drawnCells = [];
         }
     }, {
         key: "_drawRoundaboutGrid",
@@ -1043,6 +1044,8 @@ var CellularAutomata = (function () {
     function CellularAutomata(cellsMap, cellsNeighbours, drivingRules, ingoingLanesCount) {
         var _this = this;
 
+        var truckRatio = arguments.length <= 4 || arguments[4] === undefined ? 0 : arguments[4];
+
         _classCallCheck(this, CellularAutomata);
 
         this._iterations = 0;
@@ -1052,8 +1055,11 @@ var CellularAutomata = (function () {
         this._vehicles = [];
 
         var vehicles = [];
-        (0, _JsWhyYouNoImplementJs.range)(0, 500).forEach(function () {
+        (0, _JsWhyYouNoImplementJs.range)(0, Math.round(500 * (1 - truckRatio))).forEach(function () {
             vehicles.push(_VehicleFactoryJs2['default'].newCar(_this._drivingRules));
+        });
+        (0, _JsWhyYouNoImplementJs.range)(0, Math.round(500 * truckRatio)).forEach(function () {
+            vehicles.push(_VehicleFactoryJs2['default'].newTruck(_this._drivingRules));
         });
         vehicles.forEach(function (vehicle) {
             vehicle.setPath(drivingRules.randomPath());
@@ -1098,32 +1104,31 @@ var CellularAutomata = (function () {
     }, {
         key: '_moveVehicles',
         value: function _moveVehicles() {
-            var _this2 = this;
-
-            this._vehicles.forEach(function (vehicle) {
+            for (var i = 0; i < this._vehicles.length; i++) {
+                var vehicle = this._vehicles[i];
                 try {
-                    vehicle.moveToNextIteration(_this2._cellsMap, _this2._cellsNeighbours);
+                    vehicle.moveToNextIteration(this._cellsMap, this._cellsNeighbours);
                 } catch (e) {
                     if (e instanceof _CellsMapJs.ExitRoadEnd) {
                         vehicle.remove();
-                        _this2._vehicles.splice(_this2._vehicles.indexOf(vehicle), 1);
+                        this._vehicles.splice(i, 1);
                     } else {
                         throw e;
                     }
                 }
-            });
+            }
         }
     }, {
         key: '_addVehiclesFromQueue',
         value: function _addVehiclesFromQueue() {
-            var _this3 = this;
+            var _this2 = this;
 
             this._vehiclesQueues.forEach(function (queue, queueLane) {
                 var vehicle = queue.nextVehicle();
                 if (vehicle) {
-                    if (_this3._cellsMap.nothingOnEntrance(queueLane, vehicle.lengthCells())) {
-                        _this3._vehicles.push(vehicle);
-                        _this3._cellsMap.addVehicle(vehicle, queueLane, vehicle.lengthCells() - 1);
+                    if (_this2._cellsMap.nothingOnEntrance(queueLane, vehicle.lengthCells())) {
+                        _this2._vehicles.push(vehicle);
+                        _this2._cellsMap.addVehicle(vehicle, queueLane, vehicle.lengthCells() - 1);
                     } else {
                         queue.addVehicle(vehicle);
                     }
@@ -1992,6 +1997,7 @@ var roundaboutThreeLanes = new RoundaboutSpecification(4.5, 3, 56 / 2, {
 
 exports.roundaboutBukowe = roundaboutBukowe;
 exports.roundaboutThreeLanes = roundaboutThreeLanes;
+exports.RoundaboutSpecification = RoundaboutSpecification;
 
 },{"../../JsWhyYouNoImplement.js":5,"./AdherentRoad.js":17,"./Direction.js":18,"./InnerRoad.js":19,"./Lane.js":20}],22:[function(require,module,exports){
 "use strict";
@@ -2410,71 +2416,5 @@ function nextIteration() {
     }, 100);
 };
 nextIteration();
-
-//import {RoundaboutDrawer} from './GUI/RoundaboutDrawer.js';
-//import CellsDrawer from './GUI/CellsDrawer.js';
-//import Translator from './GUI/Translator.js';
-//import UnitConverter from './GUI/UnitConverter.js';
-//import {roundaboutBukowe, roundaboutThreeLanes} from './Simulation/Specification/RoundaboutSpecifications.js';
-//import {CellsMap} from './Simulation/CellsMap.js';
-//import CellularAutomata from './Simulation/CellularAutomata.js';
-//import CellsNeighbours from './Simulation/CellsNeighbours.js';
-//import {DrivingRules} from './Simulation/DrivingRules.js';
-//import {range} from './JsWhyYouNoImplement.js';
-//
-//let unitConverter = new UnitConverter(
-//    roundaboutBukowe.roundaboutDiameter() + roundaboutBukowe.adherentRoadLength() * 2,
-//    Math.min(200, 200)
-//);
-//
-//let roundaboutBukoweCellsMap = new CellsMap(
-//    roundaboutBukowe,
-//    unitConverter
-//);
-//
-//var cellsNeighbours = new CellsNeighbours(
-//    roundaboutBukoweCellsMap.cellsCountsOnInnerRoadLanes(),
-//    roundaboutBukowe.adherentLanesCount() / 2,
-//    unitConverter.metersAsCells(roundaboutBukowe.adherentRoadLength())
-//);
-//
-//
-//let drivingRules = [
-//    DrivingRules.newRules1(
-//        roundaboutBukowe.lanesCount(),
-//        roundaboutBukowe.adherentLanesCount()
-//    ),
-//    DrivingRules.newRules2(
-//        roundaboutBukowe.lanesCount(),
-//        roundaboutBukowe.adherentLanesCount()
-//    ),
-//    DrivingRules.newRules3(
-//        roundaboutBukowe.lanesCount(),
-//        roundaboutBukowe.adherentLanesCount()
-//    ),
-//    DrivingRules.newRules4(
-//        roundaboutBukowe.lanesCount(),
-//        roundaboutBukowe.adherentLanesCount()
-//    )
-//];
-//drivingRules.forEach(drivingRule => {
-//
-//    var results = [];
-//    range(0, 20).forEach(() => {
-//        let cellularAutomata = new CellularAutomata(
-//            roundaboutBukoweCellsMap,
-//            cellsNeighbours,
-//            drivingRule,
-//            roundaboutBukowe.adherentLanesCount() / 2
-//        );
-//
-//        while (!cellularAutomata.hasFinished()) {
-//            cellularAutomata.nextIteration();
-//        }
-//        results.push(cellularAutomata.iterations());
-//    });
-//
-//    console.log("Finished simulation: ",  results.join(","));
-//});
 
 },{"./GUI/CellsDrawer.js":1,"./GUI/RoundaboutDrawer.js":2,"./GUI/Translator.js":3,"./GUI/UnitConverter.js":4,"./Simulation/CellsMap.js":8,"./Simulation/CellsNeighbours.js":9,"./Simulation/CellularAutomata.js":10,"./Simulation/DrivingRules.js":11,"./Simulation/Specification/RoundaboutSpecifications.js":21}]},{},[24]);
