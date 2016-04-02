@@ -1064,6 +1064,9 @@ var CellularAutomata = (function () {
         vehicles.forEach(function (vehicle) {
             vehicle.setPath(drivingRules.randomPath());
         });
+        vehicles = vehicles.sort(function () {
+            return 0.5 < Math.random();
+        });
 
         this._vehiclesQueues = new Map();
         _SpecificationDirectionJs2['default'].allDirections().forEach(function (entranceRoadDirection) {
@@ -2119,6 +2122,9 @@ var Vehicle = (function () {
                 if (this._hasStopped() && nothingInFrontOnRoundabout) {
                     this._accelerate(this.maxSpeedWhenTurning());
                 }
+                if (this.currentSpeed() > this.maxSpeedWhenTurning()) {
+                    this._break(this.maxSpeedWhenTurning());
+                }
                 if (nothingInFrontOnRoundabout) {
                     cellsMap.takeEntrance(this, cellsNeighbours);
                 }
@@ -2402,7 +2408,7 @@ var roundaboutCellsDrawer = new _GUICellsDrawerJs2['default'](_SimulationSpecifi
 var cellsNeighbours = new _SimulationCellsNeighboursJs2['default'](roundaboutBukoweCellsMap.cellsCountsOnInnerRoadLanes(), _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2, unitConverter.metersAsCells(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentRoadLength()));
 
 var drivingRules = _SimulationDrivingRulesJs.DrivingRules.newRules4(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.lanesCount(), _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount());
-var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap, cellsNeighbours, drivingRules, _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2);
+var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap, cellsNeighbours, drivingRules, _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2, 0.5);
 
 roundaboutDrawer.draw();
 function nextIteration() {
