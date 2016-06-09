@@ -1172,63 +1172,6 @@ var CellularAutomata = (function () {
         vehicles = vehicles.sort(function () {
             return 0.5 < Math.random();
         });
-        // var vehicles = [
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        // ];
-        // console.log(vehicles[0]._id,  vehicles[0].id().toString(16));
-        // console.log(vehicles[1]._id,  vehicles[1].id().toString(16));
-        // console.log(vehicles[2]._id,  vehicles[2].id().toString(16));
-        // console.log(vehicles[3]._id,  vehicles[3].id().toString(16));
-        // console.log(vehicles[4]._id,  vehicles[4].id().toString(16));
-        // console.log(vehicles[5]._id,  vehicles[5].id().toString(16));
-        // vehicles[0]._id = 4641049;
-        // vehicles[1]._id = 4641050;
-        // vehicles[2]._id = 4641051;
-        // vehicles[3]._id = 6853813;
-        // vehicles[4]._id = 6853814;
-        // vehicles[5]._id = 6853815;
-        // vehicles[0].setPath(new Path(Direction.newEast(), 0, 1, Direction.newWest(), 0));
-        // vehicles[1].setPath(new Path(Direction.newEast(), 0, 1, Direction.newWest(), 0));
-        // vehicles[2].setPath(new Path(Direction.newEast(), 0, 1, Direction.newWest(), 0));
-        // // console.log("Right vehicles ", vehicles[0].id());
-        // vehicles[3].setPath(new Path(Direction.newEast(), 1, 0, Direction.newNorth(), 1));
-        // vehicles[4].setPath(new Path(Direction.newEast(), 1, 0, Direction.newNorth(), 1));
-        // vehicles[5].setPath(new Path(Direction.newEast(), 1, 0, Direction.newNorth(), 1));
-
-        // var vehicles = [
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        //     VehicleFactory.newCar(this._drivingRules),
-        // ];
-        // vehicles[0]._id = 2048;
-        // vehicles[1]._id = 2049;
-        // vehicles[2]._id = 2050;
-        // vehicles[3]._id = 2051;
-        // vehicles[4]._id = 2052;
-        // vehicles[5]._id = 4000;
-        // vehicles[6]._id = 4001;
-        // vehicles[7]._id = 4002;
-        // vehicles[8]._id = 4003;
-        // vehicles[0].setPath(new Path(Direction.newWest(), 0, 1, Direction.newWest(), 0));
-        // vehicles[1].setPath(new Path(Direction.newWest(), 0, 1, Direction.newWest(), 0));
-        // vehicles[2].setPath(new Path(Direction.newWest(), 0, 1, Direction.newWest(), 0));
-        // vehicles[3].setPath(new Path(Direction.newWest(), 0, 1, Direction.newWest(), 0));
-        // vehicles[4].setPath(new Path(Direction.newWest(), 0, 1, Direction.newWest(), 0));
-        // vehicles[5].setPath(new Path(Direction.newNorth(), 1, 0, Direction.newSouth(), 1));
-        // vehicles[6].setPath(new Path(Direction.newNorth(), 1, 0, Direction.newSouth(), 1));
-        // vehicles[7].setPath(new Path(Direction.newNorth(), 1, 0, Direction.newSouth(), 1));
-        // vehicles[8].setPath(new Path(Direction.newNorth(), 1, 0, Direction.newSouth(), 1));
 
         this._vehiclesQueues = new Map();
         _SpecificationDirectionJs2['default'].allDirections().forEach(function (entranceRoadDirection) {
@@ -2238,7 +2181,7 @@ var RoundaboutSpecification = (function () {
     return RoundaboutSpecification;
 })();
 
-var roundaboutBukowe = new RoundaboutSpecification(4.5, 2, 15, {
+var roundaboutBukowe = new RoundaboutSpecification(4.5, 2, 56 / 2, {
     ingoingLanes: 2,
     outgoingLanes: 2,
     lanesWidth: 3.5
@@ -2688,7 +2631,7 @@ var roundaboutCellsDrawer = new _GUICellsDrawerJs2['default'](_SimulationSpecifi
 
 var cellsNeighbours = new _SimulationCellsNeighboursJs2['default'](roundaboutBukoweCellsMap.cellsCountsOnInnerRoadLanes(), _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2, unitConverter.metersAsCells(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentRoadLength()));
 
-var drivingRules = _SimulationDrivingRulesJs.DrivingRules.newRules4(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.lanesCount(), _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount());
+var drivingRules = _SimulationDrivingRulesJs.DrivingRules.newRules5(_SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.lanesCount(), _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount());
 var cellularAutomata = new _SimulationCellularAutomataJs2['default'](roundaboutBukoweCellsMap, cellsNeighbours, drivingRules, _SimulationSpecificationRoundaboutSpecificationsJs.roundaboutBukowe.adherentLanesCount() / 2, 0.5);
 
 roundaboutDrawer.draw();
